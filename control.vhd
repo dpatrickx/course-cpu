@@ -14,29 +14,21 @@ entity control is
         opIn        : in std_logic_vector(4 downto 0);
         comBody     : in std_logic_vector(10 downto 0);
 
-        regDst      : out std_logic_vector(1 downto 0);
-        regWrite    : out std_logic_vector(2 downto 0);
+        -- im
+        immEx       : out std_logic;
+        immSrc      : out std_logic_vector(2 downto 0);
+        -- alu
+        aluSrcA     : out std_logic_vector(2 downto 0);
+        aluSrcB     : out std_logic_vector(2 downto 0);
+        aluOp       : out std_logic_vector(4 downto 0);
+        -- mem
         memToReg    : out std_logic;
         memRead     : out std_logic;
         memWrite    : out std_logic;
         memData     : out std_logic;
-        aluSrcA     : out std_logic_vector(2 downto 0);
-        aluSrcB     : out std_logic_vector(2 downto 0);
-        aluOp       : out std_logic_vector(4 downto 0);
-        pcWrite     : out std_logic;
-        pcSrc       : out std_logic_vector(1 downto 0);
-        immEx       : out std_logic;
-        immSrc      : out std_logic_vector(2 downto 0);
-
-        pcOut       : out std_logic_vector(15 downto 0);
-        opOut       : out std_logic_vector(4 downto 0);
-        rd          : out std_logic_vector(2 downto 0);
-        rs          : out std_logic_vector(2 downto 0);
-        rt          : out std_logic_vector(2 downto 0);
-        im          : out std_logic_vector(15 downto 0);
-        spVal       : out std_logic_vector(15 downto 0);
-        A           : out std_logic_vector(15 downto 0);
-        B           : out std_logic_vector(15 downto 0);
+        -- reg
+        regDst      : out std_logic_vector(1 downto 0);
+        regWrite    : out std_logic_vector(2 downto 0));
 end control;
 
 architecture behavior of control is
@@ -212,7 +204,7 @@ begin
                 aluSrcA <= Srca_A;   aluSrcB  <= Srca_B;   aluOp     <= PASSA_;
                 memRead <= "0";      memToReg <= "0";      memWrite  <= "0";     memData <= Memd_A;
                 regDst  <= Regd_SP;  regWrite <= Regw_NO;
-                pcSrc   <= Pcs_RX;
+                pcSrc   <= Pcs_NR;
             when others =>
                 -- nothing
         end case;

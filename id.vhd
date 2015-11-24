@@ -32,15 +32,16 @@ entity id is
         rd          : out std_logic_vector(2 downto 0);
         rs          : out std_logic_vector(2 downto 0);
         rt          : out std_logic_vector(2 downto 0);
-        im          : out std_logic_vector(15 downto 0);
-        spVal       : out std_logic_vector(15 downto 0);
-        A           : out std_logic_vector(15 downto 0);
-        B           : out std_logic_vector(15 downto 0);
+        im          : out std_logic_vector(15 downto 0));
 end id;
 
 architecture behavior of id is
-    -- get rd due to regDst
+    pcOut <= pcIn;
+    opOut <= opIn;
+    rs <= instBody(10 downto 8);
+    rt <= instBody(7 downto 5);
     getRd: process(regDst, instBody)
+    -- rd
     begin
         case regDst is
             when Regd_RX =>
@@ -53,7 +54,7 @@ architecture behavior of id is
                 rd <= ZERO_16;
         end case;
     end process;
-    -- get im due to immSrc
+    -- im
     getIm: process(immSrc, instBody)
     begin
         case immSrc is
