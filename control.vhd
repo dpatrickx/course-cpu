@@ -6,119 +6,33 @@ use my_data_types.ALL;
 
 -- author: dpatrickx
 -- ID : get control signals according to instructions
+-- ID : expand immidiate to 16 bits
 
 entity control is
     port(
-        pcIn: in std_logic_vector(15 downto 0);
-        opIn: in std_logic_vector(4 downto 0);
-        comBody: in std_logic_vector(10 downto 0);
+        pcIn        : in std_logic_vector(15 downto 0);
+        opIn        : in std_logic_vector(4 downto 0);
+        comBody     : in std_logic_vector(10 downto 0);
 
-        regDst : out std_logic_vector(1 downto 0)           := "00";
-        regWrite : out std_logic_vector(2 downto 0)         := "000";
-        memToReg : out std_logic                            := "0";
-        memRead : out std_logic                             := "0";
-        memWrite : out std_logic                            := "0";
-        memData : out std_logic;
-        aluSrcA : out std_logic_vector(2 downto 0)          := "000";     -- not decided
-        aluSrcB : out std_logic_vector(2 downto 0)          := "000";
-        aluOp : out std_logic_vector(4 downto 0);           := "00000"-- not decided
-
-        pcWrite : out std_logic                             := "0";
-        pcSrc : out std_logic_vector(1 downto 0)            := "000";       -- not decided
-        immEx : out std_logic                               := "0";
-        immSrc : out std_logic_vector(2 downto 0)           := "000";
-
-        pcOut: out std_logic_vector(15 downto 0)            := "0000000000000000";
-        opOut : out std_logic_vector(4 downto 0)            := "00000";
-        rd : out std_logic_vector(2 downto 0)               := "000";
-        rs : out std_logic_vector(2 downto 0)               := "000";
-        rt : out std_logic_vector(2 downto 0)               := "000";
-        im : out std_logic_vector(15 downto 0)              := "0000000000000000";
-        spVal : out std_logic_vector(15 downto 0)           := "0000000000000000";
-        A : out std_logic_vector(15 downto 0)               := "0000000000000000";
-        B : out std_logic_vector(15 downto 0)               := "0000000000000000");
+        -- im
+        immEx       : out std_logic;
+        immSrc      : out std_logic_vector(2 downto 0);
+        -- alu
+        aluSrcA     : out std_logic_vector(2 downto 0);
+        aluSrcB     : out std_logic_vector(2 downto 0);
+        aluOp       : out std_logic_vector(4 downto 0);
+        -- mem
+        memToReg    : out std_logic;
+        memRead     : out std_logic;
+        memWrite    : out std_logic;
+        memData     : out std_logic;
+        -- reg
+        regDst      : out std_logic_vector(1 downto 0);
+        regWrite    : out std_logic_vector(2 downto 0));
 end control;
 
 architecture behavior of control is
-constant Srcb_PC : std_logic_vector(2 downto 0)  := "010";
-constant Srcb_IH : std_logic_vector(2 downto 0)  := "100";
-constant Srcb_SP : std_logic_vector(2 downto 0)  := "111";
-constant Srcb_B  : std_logic_vector(2 downto 0)  := "000";
-constant Srcb_IM : std_logic_vector(2 downto 0)  := "111";
-
-constant Srca_A  : std_logic_vector(2 downto 0)  := "0";
-constant Srca_IM : std_logic_vector(2 downto 0)  := "1";
-
-constant Regw_NO : std_logic_vector(2 downto 0)  := "000";
-constant Regw_RD : std_logic_vector(2 downto 0)  := "001";
-constant Regw_T  : std_logic_vector(2 downto 0)  := "011";
-constant Regw_IH : std_logic_vector(2 downto 0)  := "101";
-constant Regw_SP : std_logic_vector(2 downto 0)  := "010";
-
-constant Regd_RX  : std_logic_vector(1 downto 0)  := "00";
-constant Regd_RY  : std_logic_vector(1 downto 0)  := "01";
-constant Regd_RZ  : std_logic_vector(1 downto 0)  := "10";
-constant Regd_SP  : std_logic_vector(1 downto 0)  := "11";
-
-constant Imms_10  : std_logic_vector(2 downto 0)  := "000";
-constant Imms_70  : std_logic_vector(2 downto 0)  := "001";
-constant Imms_40  : std_logic_vector(2 downto 0)  := "010";
-constant Imms_30  : std_logic_vector(2 downto 0)  := "011";
-constant Imms_42  : std_logic_vector(2 downto 0)  := "100";
-constant Imms_00  : std_logic_vector(2 downto 0)  := "111";
-
-constant Pcs_NR   : std_logic_vector(1 downto 0)  := "00";
-constant Pcs_ID   : std_logic_vector(1 downto 0)  := "00";
-constant Pcs_RX   : std_logic_vector(1 downto 0)  := "00";
-
-constant Memd_A   : std_logic := "0";
-constant Memd_B   : std_logic := "1";
 begin
-    -- get rd due to regDst
-    getRd: process(regDst, comBody)
-    begin
-        case regDst is
-            when Regd_RX =>
-                rd <= comBody(10 downto 8);
-            when Regd_RY =>
-                rd <= comBody(7 downto 5);
-            when Regd_RZ =>
-                rd <= comBody(4 downto 2);
-            when Regd_SP =>
-                rd <= ZERO_16;
-        end case;
-    end process;
-    -- get im due to immSrc
-    getIm: process(immSrc, comBody)
-    begin
-        case immSrc is
-            when Imms_10 =>
-                case comBody(10) is
-                    when "0" => im <= "00000" & comBody;
-                    when "1" => im <= "11111" & comBody;
-                end case;
-            when Imms_70 =>
-                case comBody(7) is
-                    when "0" => im <= ZERO_8 & comBody(7 downto 0);
-                    when "1" => im <= ONE_8  & comBody(7 downto 0);
-                end case;
-            when Imms_40 =>
-                case comBody(4) is
-                    when "0" => im <= ZERO_11 & comBody(4 downto 0);
-                    when "1" => im <= ONE_11  & comBody(4 downto 0);
-                end case;
-            when Imms_30 =>
-                case comBody(3) is
-                    when "0" => im <= ZERO_12 & comBody(3 downto 0);
-                    when "1" => im <= ONE_12  & comBody(3 downto 0);
-                end case;
-            when Imms_42 =>
-            -- only need to use last 3 bits
-                im <= ZERO_13 & comBody(4 downto 2);
-            when others =>
-                im <= ZERO_16;
-        end case;
-    end process;
     -- decide control signals according to instructions
     getConSig: process(opIn, comBody)
     begin
@@ -290,7 +204,9 @@ begin
                 aluSrcA <= Srca_A;   aluSrcB  <= Srca_B;   aluOp     <= PASSA_;
                 memRead <= "0";      memToReg <= "0";      memWrite  <= "0";     memData <= Memd_A;
                 regDst  <= Regd_SP;  regWrite <= Regw_NO;
-                pcSrc   <= Pcs_RX;
+                pcSrc   <= Pcs_NR;
+            when others =>
+                -- nothing
         end case;
     end process;
 
