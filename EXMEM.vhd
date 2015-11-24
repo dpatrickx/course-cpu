@@ -12,7 +12,7 @@ USE IEEE.STD_LOGIC_UNSIGNED.ALL;
 --library UNISIM;
 --use UNISIM.VComponents.all;
 
-entity IFID is
+entity IDEX is
 	port(clk: in std_logic;
 		 rst: in std_logic;
 
@@ -20,29 +20,27 @@ entity IFID is
 		 OP_in: in std_logic_vector(4 downto 0);
 		 func1_in: in std_logic_vector(4 downto 0);
 		 func2_in: in std_logic_vector(1 downto 0);
-		 reg10_8_in: in std_logic_vector(2 downto 0);
-		 reg7_5_in: in std_logic_vector(2 downto 0);
-		 reg4_2_in: in std_logic_vector(2 downto 0);
-		 reg3_0_in: in std_logic_vector(3 downto 0);
-		 reg4_0_in: in std_logic_vector(4 downto 0);
-		 reg7_0_in: in std_logic_vector(7 downto 0);
-		 reg10_0_in: in std_logic_vector(10 downto 0);
+		 ex_in: in std_logic_vector(15 downto 0);
+		 ans_in: in std_logic_vector(15 downto 0);
+		 rd_in: in std_logic_vector(2 downto 0);
+		 rs_in: in std_logic_vector(2 downto 0);
+		 rt_in: in std_logic_vector(2 downto 0);
+		 im_in: in std_logic_vector(15 downto 0);
 
 		 PC_out: out std_logic_vector(15 downto 0);
 		 OP_out: out std_logic_vector(4 downto 0);
 		 func1_out: out std_logic_vector(4 downto 0);
 		 func2_out: out std_logic_vector(1 downto 0);
-		 reg10_8_out: out std_logic_vector(2 downto 0);
-		 reg7_5_out: out std_logic_vector(2 downto 0);
-		 reg4_2_out: out std_logic_vector(2 downto 0);
-		 reg3_0_out: out std_logic_vector(3 downto 0);
-		 reg4_0_out: out std_logic_vector(4 downto 0);
-		 reg7_0_out: out std_logic_vector(7 downto 0);
-		 reg10_0_out: out std_logic_vector(10 downto 0)
+		 ex_out: out std_logic_vector(15 downto 0);
+		 ans_out: out std_logic_vector(15 downto 0);
+		 rd_out: out std_logic_vector(2 downto 0);
+		 rs_out: out std_logic_vector(2 downto 0);
+		 rt_out: out std_logic_vector(2 downto 0);
+		 im_out: out std_logic_vector(15 downto 0)
 		 );
-end IFID;
+end IDEX;
 
-architecture behavior of IFID is
+architecture behavior of IDEX is
 begin
 	process(clk)
 	begin
@@ -55,13 +53,13 @@ begin
 			OP_out <= OP_in;
 			func1_out <= func1_in;
 			func2_out <= func2_in;
-			reg10_8_out <= reg10_8_in;
-			reg7_5_out <= reg7_5_in;
-			reg4_2_out <= reg4_2_in;
-			reg3_0_out <= reg3_0_in;
-			reg4_0_out <= reg4_0_in;
-			reg7_0_out <= reg7_0_in;
-			reg10_0_out <= reg10_0_in;
+			ex_out <= A_in;
+			ans_out <= B_in;
+			rd_out <= rd_in;
+			rs_out <= rs_in;
+			rt_out <= rt_in;
+			im_out <= im_in;
+			SpAns_out <= SpAns_in;
 		end if;
 	end process;
 
