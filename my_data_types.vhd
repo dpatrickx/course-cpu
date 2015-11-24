@@ -41,8 +41,8 @@ PACKAGE my_data_types IS
     constant Srcb_B  : std_logic_vector(2 downto 0)  := "000";
     constant Srcb_IM : std_logic_vector(2 downto 0)  := "111";
 
-    constant Srca_A  : std_logic_vector(2 downto 0)  := "0";
-    constant Srca_IM : std_logic_vector(2 downto 0)  := "1";
+    constant Srca_A  : std_logic  := "0";
+    constant Srca_IM : std_logic  := "1";
 
     constant Regw_NO : std_logic_vector(2 downto 0)  := "000";
     constant Regw_RD : std_logic_vector(2 downto 0)  := "001";
