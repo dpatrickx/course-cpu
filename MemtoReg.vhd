@@ -13,9 +13,7 @@ USE IEEE.STD_LOGIC_UNSIGNED.ALL;
 --use UNISIM.VComponents.all;
 
 entity MemReg is
-	port(clk: in std_logic;
-
-		 MemtoReg: in std_logic;
+	port(MemtoReg: in std_logic;
 		 data_from_mem: in std_logic_vector(15 downto 0); --data0
 		 data_from_alu: in std_logic_vector(15 downto 0); --ans
 
@@ -25,14 +23,12 @@ end MemReg;
 
 architecture behavior of MemReg is
 begin
-	process(clk)
+	process(data_from_mem, data_from_alu)
 	begin
-		if clk = '1' and clk'event then
-			if MemtoReg='1' then
-				data <= data_from_mem;
-			else
-				data <= data_from_alu;
-			end if;
+		if MemtoReg='1' then
+			data <= data_from_mem;
+		else
+			data <= data_from_alu;
 		end if;
 	end process;
 

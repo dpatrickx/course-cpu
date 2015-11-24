@@ -25,14 +25,12 @@ end MemDataTrans;
 
 architecture behavior of MemDataTrans is
 begin
-	process(clk)
+	process(data_from_ex, data_from_wb)
 	begin
-		if clk = '1' and clk'event then
-			if data_transfer='1' then
-				data_input <= data_from_ex;
-			else
-				data_input <= data_from_wb;
-			end if;
+		if data_transfer='1' then
+			data_input <= data_from_ex;
+		else
+			data_input <= data_from_wb;
 		end if;
 	end process;
 

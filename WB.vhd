@@ -13,9 +13,7 @@ USE IEEE.STD_LOGIC_UNSIGNED.ALL;
 --use UNISIM.VComponents.all;
 
 entity WB is
-	port(clk: in std_logic;
-
-		 rd: in std_logic_vector(15 downto 0);
+	port(rd: in std_logic_vector(15 downto 0);
 		 data: in std_logic_vector(15 downto 0);
 
 		 data_reg: out std_logic_vector(15 downto 0);
@@ -26,13 +24,11 @@ end WB;
 
 architecture behavior of WB is
 begin
-	process(clk)
+	process(data, rd)
 	begin
-		if clk = '1' and clk'event then
-			data_reg <= data;
-			addr_reg <= rd;
-			data_trans <= data;
-		end if;
+		data_reg <= data;
+		addr_reg <= rd;
+		data_trans <= data;
 	end process;
 
 end behavior;

@@ -14,7 +14,6 @@ USE IEEE.STD_LOGIC_UNSIGNED.ALL;
 
 entity MemProcess is
 	port(clk: in std_logic;
-		 rst: in std_logic;
 
 		 ex_data: in std_logic_vector(15 downto 0);
 		 ans: in std_logic_vector(15 downto 0);
@@ -36,9 +35,9 @@ architecture behavior of MemProcess is
 	signal current_state: state: = ready;
 	signal data0 : std_logic_vector(15 downto 0);
 begin
-	process(clk, rst)
+	process(clk)
 	begin
-		if clk = '1' and clk'event and rst='1' then
+		if clk = '1' and clk'event then
 			if MemWrite = '1' then
 				case current_state is
 					when ready =>

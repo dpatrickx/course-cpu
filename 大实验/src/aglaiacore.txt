@@ -1,0 +1,920 @@
+;==============================================================================
+;
+;	
+;             #        ####    #           #      ###       #
+;            # #      #    #   #          # #      #       # #
+;           #   #     #        #         #   #     #      #   #
+;          #######    #   ##   #        #######    #     #######  
+;         #       #   #    #   #    #  #       #   #    #       #
+;        #         #   ####    ###### #         # ###  #         #
+;
+;
+;
+;			AglaiaCore THCO MIPS内核
+;
+;==============================================================================
+
+B START
+NOP
+
+;==========================================================
+;
+; 	INTERRUPT	中断与异常处理程序入口
+;
+; 调用中断时的栈状态
+; |	????	|
+; |-------------|
+; |     IH	| <= SP+4
+; |-------------|
+; |     EPc	| <= SP+3
+; |-------------|
+; |LF|   ENo    | <= SP+2
+; |-------------|
+; |   Reason    | <= SP+1
+; |-------------|
+; |    Addr     | <= SP
+; |-------------|
+;
+; 保存寄存器后的栈状态
+; |	????	|
+; |-------------|
+; |     IH	| <= SP+C
+; |-------------|
+; |     EPc	| <= SP+B
+; |-------------|
+; |LF|   ENo    | <= SP+A
+; |-------------|
+; |   Reason    | <= SP+9
+; |-------------|
+; |    Addr	| <= SP+8
+; |-------------|
+; |    R7	| <= SP+7
+; |-------------|
+; |    R6	| <= SP+6
+; |-------------|
+; |    R5	| <= SP+5
+; |-------------|
+; |    R4	| <= SP+4
+; |-------------|
+; |    R3	| <= SP+3
+; |-------------|
+; |    R2	| <= SP+2
+; |-------------|
+; |    R1	| <= SP+1
+; |-------------|
+; |    R0	| <= SP
+; |-------------|
+;==========================================================
+INTERRUPT: 
+	; 保存寄存器
+	ADDSP 0xFFF8
+	SW_SP R0 0x0000
+	SW_SP R1 0x0001
+	SW_SP R2 0x0002
+	SW_SP R3 0x0003
+	SW_SP R4 0x0004
+	SW_SP R5 0x0005
+	SW_SP R6 0x0006
+	SW_SP R7 0x0007
+
+	LW_SP R0 0x000A
+	; 只接受后5位
+	LI R1 0x001F
+	AND R0 R1
+	
+	; ENo == 0x00 Invalid instruction
+	BEQZ R0 INTERRUPT_DO_EXIT
+	; ENo == 0x01 Page fault
+	LI R1 0x0001
+	SUBU R0 R1 R2
+	BEQZ R2 INTERRUPT_DO_PAGE_FAULT
+	; ENo == 0x02 Priviledged instruction
+	LI R1 0x0002
+	SUBU R0 R1 R2
+	BEQZ R2 INTERRUPT_DO_EXIT
+	; ENo == 0x03 Syscall
+	LI R1 0x0003
+	SUBU R0 R1 R2
+	BEQZ R2 INTERRUPT_DO_SYSCALL	
+	; ENo == 0x0010 Timer
+	LI R1 0x0010
+	SUBU R0 R1 R2
+	BEQZ R2 INTERRUPT_DO_TIMER
+	
+	B RET_FROM_INT
+
+INTERRUPT_DO_PAGE_FAULT:
+	B DO_PAGE_FAULT
+INTERRUPT_DO_TIMER:
+	B DO_TIMER
+INTERRUPT_DO_EXIT:
+	B DO_EXIT
+INTERRUPT_DO_SYSCALL:
+	B DO_SYSCALL
+
+;==========================================================	
+; 
+;	START	内核初始化入口（系统启动入口）
+;
+;==========================================================
+START:
+	; 初始化物理页引用计数数组
+	; 物理页0x00-0x3F填充为2（内核占用1，进程0占用1）
+	; 物理页0x40-0x1FF填充为0（可用）
+	LI R0 0x0080
+	SLL R0 R0 0x0000		; R0 - 起始地址0x8000
+	LI R1 0x0080
+	SLL R1 R1 0x0000
+	ADDIU R1 0x0040			; R1 - 终止地址 0x8040
+	LI R2 0x0002			; R2 - 待填充内容
+	
+INIT_PHYPAGE_1:
+	SW R0 R2 0x0000	
+	ADDIU R0 0x0001
+	SUBU R0 R1 R3
+	BNEZ R3 INIT_PHYPAGE_1
+
+	LI R3 0x001C
+	SLL R3 R3 0x0004
+	ADDU R1 R3 R1			; R1 - 终止地址 0x8200
+	LI R2 0x0000
+
+INIT_PHYPAGE_2:
+	SW R0 R2 0x0000
+	ADDIU R0 0x0001
+	SUBU R0 R1 R3
+	BNEZ R3 INIT_PHYPAGE_2
+
+	; 初始化进程0的进程状态页 0x9000 - 0x9400
+	LI R1 0x0090
+	SLL R1 R1 0x0000
+		
+	LI R0 0x0001			; 进程状态为运行（1）
+	SW R1 R0 0x0000
+	
+	LI R0 0x0000
+	SW R1 R0 0x000D			; 进程Pid = 0
+
+	LI R0 0x0094
+	SLL R0 R0 0x0000
+	ADDIU R0 0xFFFF
+	SW R1 R0 0x000B			; 内核栈指针KP <= 0x93FF 进程状态页末尾
+	0x8001				; MTKP
+	MTSP R0				; 修改堆栈指针
+
+	LI R0 0x0000
+	NOT R0 R0			; R0 <= 0xFFFF 用户栈末尾
+	SW R1 R0 0x000C			; 用户栈指针UP <= 0xFFFF 用户数据段末尾
+	0x8000				; MTUP
+	
+	; 初始化进程0的页表
+	; 64K地址空间全部做恒等映射
+	; 如下为各内存段的属性
+	; 0x0000 - 0x3FFF 内核代码 X P
+	; 0x4000 - 0x7FFF 用户代码 X U P
+	; 0x8000 - 0xBFFF 内核数据 W P
+	; 0xC000 - 0xFFFF 用户数据 W U P
+	ADDIU R1 0x0020			; R1 <= 0x9020 页表首地址
+	LI R2 0x0009			; R2 <=  X P 内核代码页值
+	LI R3 0x0080			; R3 <= 0x0080 递增常量
+	LI R4 0x0010			; R4 <= 16 计数器
+
+INIT_VIRPAGE_1:
+	SW R1 R2 0x0000
+	ADDU R2 R3 R2
+	ADDIU R4 0xFFFF
+	ADDIU R1 0x0001
+	BNEZ R4 INIT_VIRPAGE_1
+
+	; 修改标志位：+U
+	LI R6 0x0002
+	OR R2 R6	
+	LI R4 0x0010
+
+INIT_VIRPAGE_2:
+	SW R1 R2 0x0000
+	ADDU R2 R3 R2
+	ADDIU R4 0xFFFF
+	ADDIU R1 0x0001
+	BNEZ R4 INIT_VIRPAGE_2
+
+	; 修改标志位: -X -U +W
+	LI R6 0x000A
+	NOT R6 R6
+	AND R2 R6
+	LI R6 0x0004
+	OR R2 R6
+	LI R4 0x0010
+
+INIT_VIRPAGE_3:
+	SW R1 R2 0x0000
+	ADDU R2 R3 R2
+	ADDIU R4 0xFFFF
+	ADDIU R1 0x0001
+	BNEZ R4 INIT_VIRPAGE_3
+
+	; 修改标志位: +U
+	LI R6 0x0002
+	OR R2 R6
+	LI R4 0x0010
+
+INIT_VIRPAGE_4:
+	SW R1 R2 0x0000
+	ADDU R2 R3 R2
+	ADDIU R4 0xFFFF
+	ADDIU R1 0x0001
+	BNEZ R4 INIT_VIRPAGE_4
+
+	; 装载页表基地址寄存器
+	LI R1 0x0090
+	SLL R1 R1 0x0000
+	ADDIU R1 0x0020
+	0x8107			; MTPD R1
+
+	; 输出'OK'
+	LI R0 0x004F		; 'O'
+	LI R1 0x004B		; 'K'
+	LI R2 0x000A		; '\n'
+	MFPC R7
+	ADDIU R7 0x0004
+	ADDSP 0xFFFF
+	SW_SP R7 0x0000
+	B COM_WRITE_STRING
+	ADDSP 0x0001
+
+	; 跳转到进程0入口（此时模拟从中断返回的栈状态）
+	ADDSP 0xFFFB
+	LI R0 0x0080
+	SLL R0 R0 0x0000
+	ADDIU R0 0x0001
+	SW_SP R0 0x0004		; IH - 允许中断，允许分页
+	LI R0 0x0040
+	SLL R0 R0 0x0000
+	SW_SP R0 0x0003		; EPc - 0x4000
+	LI R0 0x0080
+	SLL R0 R0 0x0000
+	SW_SP R0 0x0002 	; LF - 1 “回”到用户态
+	0x800A			; ERET
+
+;==========================================================
+;
+;	RET_FROM_INT	从中断中返回的代码
+;
+;==========================================================
+RET_FROM_INT:	
+	; 恢复寄存器
+	LW_SP R0 0x0000
+	LW_SP R1 0x0001
+	LW_SP R2 0x0002
+	LW_SP R3 0x0003
+	LW_SP R4 0x0004
+	LW_SP R5 0x0005
+	LW_SP R6 0x0006
+	LW_SP R7 0x0007
+	ADDSP 0x0008
+
+	0x800A			; ERET
+
+;==========================================================
+;
+; 	DO_TIMER	时钟中断处理函数
+;
+; 参数 SP+A (ENo) 中断时的CPU运行级
+;==========================================================
+DO_TIMER:
+	; 输出'TM'
+	LI R0 0x0054		; 'T'
+	LI R1 0x004D		; 'M'
+	LI R2 0x000A		; '\n'
+	MFPC R7
+	ADDIU R7 0x0004
+	ADDSP 0xFFFF
+	SW_SP R7 0x0000
+	B COM_WRITE_STRING
+	ADDSP 0x0001
+
+	; 检查是否从内核态中断，如果如此，不切换进程。内核态不可抢占！
+	LW_SP R0 0x000A
+	LI R1 0x0080
+	SLL R1 R1 0x0000
+	AND R0 R1
+	BEQZ R0 DO_TIMER_END
+
+	MFPC R7
+	ADDIU R7 0x0004
+	ADDSP 0xFFFF
+	SW_SP R7 0x0000
+	B RESCHEDULE
+	ADDSP 0x0001
+
+DO_TIMER_END:
+	B RET_FROM_INT
+
+;==========================================================
+;
+; 	DO_EXIT 	进程清理函数
+;
+;==========================================================
+DO_EXIT:
+	; 输出'EX'
+	LI R0 0x0045		; 'E'
+	LI R1 0x0058		; 'X'
+	LI R2 0x000A		; '\n'
+	MFPC R7
+	ADDIU R7 0x0004
+	ADDSP 0xFFFF
+	SW_SP R7 0x0000
+	B COM_WRITE_STRING
+	ADDSP 0x0001
+
+	; 获得当前进程控制块地址 => R0
+	0x6500			; MFSP R0
+	LI R1 0x00FC
+	SLL R1 R1 0x0000
+	AND R0 R1
+
+	; 将当前进程设置为不存在
+	LI R1 0x0000
+	SW R0 R1 0x0000
+
+	; 释放该进程占用的物理页
+	ADDIU R0 0x0020		; R0指向该进程页表基地址
+	LI R2 0x0000
+	ADDU R0 R2 R1
+	ADDIU R1 0x0040		; R1指向页表末尾的下一个内存单元
+DO_EXIT_FREE_PAGE:
+	; 获得该物理页在引用计数数组中的地址 => R2
+	LW R0 R2 0x0000
+	SRL R2 R2 0x0007
+	LI R3 0x0080
+	SLL R3 R3 0x0000
+	ADDU R2 R3 R2
+	
+	; 将该物理页的计数－1
+	LW R2 R3 0x0000
+	ADDIU R3 0xFFFF
+	SW R2 R3 0x0000
+
+	; 指针前进到下一个页表项
+	ADDIU R0 0x0001
+	SUBU R0 R1 R2
+	BNEZ R2 DO_EXIT_FREE_PAGE
+
+	; 重新执行进程调度，之后就不会再回到该进程
+	B RESCHEDULE
+
+;==========================================================
+; 
+;	DO_SYSCALL	系统调用入口函数
+;
+; 参数 SP+0 (R0保存地址) - 系统调用号
+;==========================================================
+DO_SYSCALL:
+	; 从栈上读取系统调用号到R0
+	LW_SP R0 0x0000
+
+	; 判断系统调用
+	BEQZ R0 DO_SYSCALL_SYS_FORK
+	LI R2 0x0001
+	SUBU R0 R2 R3
+	BEQZ R3 DO_EXIT
+	LI R2 0x0002
+	SUBU R0 R2 R3
+	BEQZ R3 SYS_PAUSE
+	LI R2 0x0003
+	SUBU R0 R2 R3
+	BEQZ R3 SYS_GETPID
+	LI R2 0x0004
+	SUBU R0 R2 R3
+	BEQZ R3 SYS_WRITE
+	; 不支持的系统调用
+	B RET_FROM_INT
+
+DO_SYSCALL_SYS_FORK:
+	B SYS_FORK
+
+;==========================================================
+;
+; 	SYS_PAUSE	主动切换进程系统调用
+;
+;==========================================================
+SYS_PAUSE:
+	; 输出'PS'
+	LI R0 0x0050		; 'P'
+	LI R1 0x0053		; 'S'
+	LI R2 0x000A		; '\n'
+	MFPC R7
+	ADDIU R7 0x0004
+	ADDSP 0xFFFF
+	SW_SP R7 0x0000
+	B COM_WRITE_STRING
+	ADDSP 0x0001
+
+	MFPC R7
+	ADDIU R7 0x0004
+	ADDSP 0xFFFF
+	SW_SP R7 0x0000
+	B RESCHEDULE
+	ADDSP 0x0001
+	B RET_FROM_INT
+
+;==========================================================
+;
+; 	SYS_GETPID	获得PID系统调用
+;
+; 返回值 SP+0 (R0保存地址) - 正在运行进程的PID
+;==========================================================
+SYS_GETPID:
+	0x6500			; MFSP R0
+	SRL R0 R0 0x0000
+	SRL R0 R0 0x0002
+	LI R1 0x0024
+	SUBU R0 R1 R0
+	SW_SP R0 0x0000
+	B RET_FROM_INT
+
+;==========================================================
+;
+; 	SYS_WRITE	串口输出系统调用
+;
+; SP+1 - 待写字符
+;==========================================================
+SYS_WRITE:
+	LW_SP R0 0x0001
+	MFPC R7
+	ADDIU R7 0x0004
+	ADDSP 0xFFFF
+	SW_SP R7 0x0000
+	B COM_WRITE
+	ADDSP 0x0001
+	B RET_FROM_INT
+
+
+;==========================================================
+;
+; 	RESCHEDULE	切换进程处理函数
+;
+;==========================================================
+RESCHEDULE:
+	; 获得当前进程的进程控制块 => R2
+	0x6500			; MFSP R0
+	LI R1 0x00FC
+	SLL R1 R1 0x0000
+	AND R0 R1
+	LI R1 0x0000
+	ADDU R0 R1 R2
+
+	; 查找下一个可用进程的进程控制块 => R3
+	LI R0 0x0000
+	ADDU R2 R0 R3
+	LI R1 0x0004
+	SLL R1 R1 0x0000
+	LI R4 0x00B0
+	SLL R4 R4 0x0000
+RESCHEDULE_NEXT:
+	ADDU R3 R1 R3
+	; 比较是不是到进程状态块数组的末端，如果是，则移动到开头
+	SUBU R3 R4 R0
+	BNEZ R0 RESCHEDULE_NEXT_2
+	LI R3 0x0090
+	SLL R3 R3 0x0000
+RESCHEDULE_NEXT_2:
+	; 检查该进程(R3)是否可以调度，如果不可以，则查看下一个进程
+	LW R3 R0 0x0000
+	LI R1 0x0001
+	SUBU R0 R1 R0
+	BNEZ R0 RESCHEDULE_NEXT
+
+	; 检查是否指向了同一个进程，如果如此，则不必进行进程切换
+	SUBU R2 R3 R0
+	BEQZ R0 RESCHEDULE_END
+
+	; 保存当前CPU状态到当前进程的进程状态块
+	0x6500			; MFSP R0
+	SW R2 R0 0x0009
+	0x8003			; MFKP R0
+	SW R2 R0 0x000B
+	0x8002			; MFUP R0
+	SW R2 R0 0x000C
+	
+	; 将当前CPU状态恢复为目标进程
+	LW R3 R0 0x0009
+	MTSP R0
+	LW R3 R0 0x000B
+	0x8001			; MTKP R0
+	LW R3 R0 0x000C
+	0x8000			; MTUP R0
+
+	; 切换页表
+	LI R0 0x0020
+	ADDU R3 R0 R0
+	0x8007			; MTPD R0
+
+RESCHEDULE_END:
+	; 注意！此时栈已经神不知鬼不觉地切换为目标进程的内核栈。
+	; 此时，进程切换已经完成。
+	LW_SP R7 0x0000
+	JR R7
+
+
+;==========================================================
+;
+; 	COM_WRITE	写串口函数
+;
+; R0 - 待写字符
+;==========================================================
+COM_WRITE:
+	; 保存寄存器上下文，使用R0 R6
+	ADDSP 0xFFFE
+	SW_SP R6 0x0000
+	SW_SP R0 0x0001
+	; 等待串口可写
+COM_TESTW:
+	LI R6 0x00BF
+	SLL R6 R6 0x0000
+	ADDIU R6 0x0001
+	LW R6 R0 0x0000
+	LI R6 0x0001
+	AND R0 R6
+	BEQZ R0 COM_TESTW
+	
+	; 将数据输出到串口0xBF00
+	LI R6 0x00BF
+	SLL R6 R6 0x0000
+	LW_SP R0 0x0001		; 寄存器上下文的R0值
+	SW R6 R0 0x0000
+	; 恢复寄存器上下文并返回
+	LW_SP R6 0x0000
+	LW_SP R0 0x0001
+	ADDSP 0x0002
+	LW_SP R7 0x0000
+	JR R7
+
+;==========================================================
+;
+;	COM_WRITE_STRING	将字符串写串口函数
+;
+; R0 - 第1个字符
+; ...
+; R2 - 第3个字符
+;==========================================================
+COM_WRITE_STRING:
+	MFPC R7
+	ADDIU R7 0x0004
+	ADDSP 0xFFFF
+	SW_SP R7 0x0000
+	B COM_WRITE
+	ADDSP 0x0001	
+	
+	LI R0 0x0000
+	ADDU R0 R1 R0
+	MFPC R7
+	ADDIU R7 0x0004
+	ADDSP 0xFFFF
+	SW_SP R7 0x0000
+	B COM_WRITE
+	ADDSP 0x0001
+
+	LI R0 0x0000
+	ADDU R0 R2 R0
+	MFPC R7
+	ADDIU R7 0x0004
+	ADDSP 0xFFFF
+	SW_SP R7 0x0000
+	B COM_WRITE
+	ADDSP 0x0001	
+	
+
+	LW_SP R7 0x0000
+	JR R7	
+
+;==========================================================
+;
+; 	SYS_FORK	创建新进程函数
+;
+;==========================================================
+SYS_FORK:
+	; 输出'FK'
+	LI R0 0x0046		; 'F'
+	LI R1 0x004B		; 'K'
+	LI R2 0x000A		; '\n'
+	MFPC R7
+	ADDIU R7 0x0004
+	ADDSP 0xFFFF
+	SW_SP R7 0x0000
+	B COM_WRITE_STRING
+	ADDSP 0x0001
+
+	; 寻找可用的进程控制块
+	LI R0 0x0090
+	SLL R0 R0 0x0000	; R0 进程控制块开头
+	LI R1 0x00B0
+	SLL R1 R1 0x0000	; R1 进程控制块数组结尾+1
+SYS_FORK_NEXT:
+	LI R2 0x0004
+	SLL R2 R2 0x0000
+	ADDU R0 R2 R0		; 第一次执行该循环体时会跳过进程0的进程控制块，因为进程0不会结束
+	SUBU R0 R1 R2
+	BEQZ R2 SYS_FORK_FULL	; 进程控制块全部被用完
+	LW R0 R2 0x0000		; R2 进程状态
+	BEQZ R2 SYS_FORK_FOUND
+	B SYS_FORK_NEXT
+	
+SYS_FORK_FOUND:
+	; R0为空闲的进程控制块
+	; 获取当前进程状态块 => R1
+	0x6520			; MFSP R1
+	LI R2 0x00FC
+	SLL R2 R2 0x0000
+	AND R1 R2
+	
+	; 将当前进程控制块页表拷贝到空闲进程控制块(采用COW，清除用户数据页的W标志)
+	ADDIU R0 0x0020		; R0 - 目的页表
+	ADDIU R1 0x0020		; R1 - 源页表
+	
+	LI R2 0x0030		; R2 - 计数器
+SYS_FORK_PD_1:
+	; 原封不动拷贝内核代码页、用户代码页与内核数据页
+	LW R1 R3 0x0000
+	SW R0 R3 0x0000
+	
+	; 增加物理页引用计数
+	MFPC R7
+	ADDIU R7 0x0002
+	B SYS_FORK_PHY_REF
+
+	ADDIU R1 0x0001
+	ADDIU R0 0x0001
+	ADDIU R2 0xFFFF
+	BNEZ R2 SYS_FORK_PD_1
+
+	LI R5 0x0004
+	NOT R5 R5		; R5 - 清除W位的Mask
+	LI R2 0x0010		; R2 - 计数器
+SYS_FORK_PD_COW:
+	; 用写时复制拷贝用户数据页
+	LW R1 R3 0x0000
+	AND R3 R5
+	SW R1 R3 0x0000
+	SW R0 R3 0x0000
+	
+	; 增加物理页引用计数
+	MFPC R7
+	ADDIU R7 0x0002
+	B SYS_FORK_PHY_REF
+
+	ADDIU R1 0x0001
+	ADDIU R0 0x0001
+	ADDIU R2 0xFFFF
+	BNEZ R2 SYS_FORK_PD_COW
+
+	; 还原R0和R1指向各自进程控制块的开头
+	ADDIU R0 0xFFA0
+	ADDIU R1 0xFFA0
+	
+	; 子进程复制父进程UP值
+	LW R1 R2 0x000C
+	SW R0 R2 0x000C
+	
+	; 子进程设置新的KP值
+	LI R2 0x0004
+	SLL R2 R2 0x0000
+	ADDIU R2 0xFFFF
+	ADDU R0 R2 R2
+	SW R0 R2 0x000B
+
+	; 子进程设置SP寄存器 => R6为子进程SP，后面复制内核栈用到
+	0x6540			; MFSP R2
+	SUBU R2 R1 R6
+	ADDU R6 R0 R6
+	LI R2 0xFFFF
+	ADDU R6 R2 R2		; 此处子进程SP为-1后的值，这一个槽用来存储RESCHEDULE返回地址
+	SW R0 R2 0x0009
+
+	; 子进程设置PID
+	LI R2 0x0000
+	ADDU R0 R2 R2
+	SRL R2 R2 0x0000
+	SRL R2 R2 0x0002
+	LI R3 0x0024
+	SUBU R2 R3 R2
+	SW R0 R2 0x000D
+	
+	; 设置两个不同进程的返回值（父进程返回子进程PID，子进程返回0）
+	SW_SP R2 0x0000
+	LI R2 0x0000
+	SW R6 R2 0x0000
+
+	; 复制内核栈(从当前进程SP+1和子进程SP(R6+1)开始)
+	0x6500			; MFSP R0
+	ADDIU R0 0x0001		; R0 <= 源栈顶+1
+	LI R1 0x0001		
+	ADDU R6 R1 R1		; R1 <= 目的栈顶+1
+	LI R3 0x000D		; 栈长度为0x000D = 7 (R0不复制) + 6
+SYS_FORK_COPY_STACK:
+	LW R0 R2 0x0000
+	SW R1 R2 0x0000
+	ADDIU R0 0x0001
+	ADDIU R1 0x0001
+	ADDIU R3 0xFFFF
+	BNEZ R3 SYS_FORK_COPY_STACK
+
+	; 让子进程的栈仿佛是在RESCHEDULE中一样
+	MFPC R7
+	ADDIU R7 0x0007
+	SW R6 R7 0xFFFF
+	
+	; 重新进行进程调度
+	MFPC R7
+	ADDIU R7 0x0004
+	ADDSP 0xFFFF
+	SW_SP R7 0x0000
+	B RESCHEDULE
+	ADDSP 0x0001		; 父进程和子进程都会从这里恢复运行
+	
+	B RET_FROM_INT
+
+; 对应物理页引用计数+1的小代码，R3为待修改页表项，破坏R4，返回R7
+SYS_FORK_PHY_REF:
+	SRL R3 R3 0x0007
+	LI R4 0x0080
+	SLL R4 R4 0x0000
+	ADDU R3 R4 R3
+	LW R3 R4 0x0000
+	ADDIU R4 0x0001
+	SW R3 R4 0x0000
+	JR R7
+
+; 进程满的情况
+SYS_FORK_FULL:
+	LI R0 0x0000
+	NOT R0 R0
+	SW_SP R0 0x0000		; 无法创建进程，返回-1
+	B RET_FROM_INT
+
+;==========================================================	
+;
+; 	DO_PAGE_FAULT	页异常处理函数
+;
+; 页异常触发情况分类：
+; 内核态中触发：
+;	写用户数据段，COW
+;	其他，内核出错
+; 用户态中触发：
+;	写用户数据段，COW
+;	其他，结束进程
+;==========================================================
+DO_PAGE_FAULT:
+	LW_SP R0 0x0009		; R0 - Reason
+	LI R1 0x0001		; 取0位 -> LF	
+	AND R1 R0
+	BEQZ R1 DO_PAGE_FAULT_SYS
+	
+	; 用户态页异常
+	LI R1 0x0002		; 取1位 -> W
+	AND R1 R0
+	BEQZ R1 DO_PAGE_FAULT_KILL
+	LW_SP R0 0x0008		; R0 - Addr
+	
+	; 检查写用户数据段
+	LI R1 0x00C0
+	SLL R1 R1 0x0000
+	NOT R1 R1
+	AND R0 R1
+	LI R1 0x00C0
+	SLL R1 R1 0x0000
+	SUBU R0 R1 R1
+	BNEZ R1 DO_PAGE_FAULT_KILL
+	
+	; 完成页复制
+	B DO_PAGE_FAULT_COPY
+
+DO_PAGE_FAULT_KILL:
+	B DO_EXIT
+	
+DO_PAGE_FAULT_SYS:
+	; 内核态页异常
+	LI R1 0x0002		; 取1位 -> W
+	AND R1 R0
+	BEQZ R1 DO_PAGE_FAULT_OOPS
+	
+	; 检查写地址是不是用户数据段
+	LW_SP R0 0x0008		; R0 - Addr
+	LI R1 0x00C0
+	SLL R1 R1 0x0000
+	NOT R1 R1
+	AND R0 R1
+	LI R1 0x00C0
+	SLL R1 R1 0x0000
+	SUBU R0 R1 R1
+	BNEZ R1 DO_PAGE_FAULT_OOPS
+
+	; 完成页复制
+	B DO_PAGE_FAULT_COPY
+
+DO_PAGE_FAULT_OOPS:
+	B DO_PAGE_FAULT_OOPS
+
+DO_PAGE_FAULT_COPY:
+	; 获得进程控制块地址->页表基地址 R0
+	0x6500			; MFSP R0
+	LI R1 0x00FC
+	SLL R1 R1 0x0000
+	AND R0 R1
+	ADDIU R0 0x20
+
+	; 确定触发异常的页表项地址 => R1
+	LW_SP R1 0x0008		; Addr
+	SRL R1 R1 0x0000
+	SRL R1 R1 0x0002
+	ADDU R0 R1 R1
+
+	; 找到物理页的引用计数地址 => R2
+	LW R1 R2 0x0000
+	SRL R2 R2 0x0007
+	LI R3 0x0080
+	SLL R3 R3 0x0000
+	ADDU R2 R3 R2
+	
+	; 如果引用计数为1，说明当前进程独占（另一个进程已经触发COW），此时只需要修改页表项属性即可
+	LW R2 R3 0x0000
+	LI R4 0x0001
+	SUBU R3 R4 R4
+	BEQZ R4 DO_PAGE_FAULT_MODIFY
+
+	; 当前物理页引用计数-1
+	ADDIU R3 0xFFFF
+	SW R2 R3 0x0000
+	
+	; 寻找新的物理页
+	LI R4 0x0082
+	SLL R4 R4 0x0000	; R4 - 0x8200物理页引用计数终止
+	LI R3 0x0080
+	SLL R3 R3 0x0000	; R3 - 0x8040物理页引用计数开始+铁定分配的物理页
+	ADDIU R3 0x0040
+DO_PAGE_FAULT_NEXT_PAGE:
+	LW R3 R5 0x0000		; R5 - 引用计数
+	BEQZ R5 DO_PAGE_FAULT_FIND_EMPTY
+	ADDIU R3 0x0001
+	SUBU R3 R4 R5
+	BNEZ R5 DO_PAGE_FAULT_NEXT_PAGE
+	
+	B 0xFFFF		; 找不到空页就死循环
+
+DO_PAGE_FAULT_FIND_EMPTY:
+	; 找到空页，R3为该页的引用计数地址
+	LI R4 0x0001
+	SW R3 R4 0x0000		; 增加该页的引用计数
+
+	; 复制页内容 -> 把源物理页暂时映射到0x0E虚拟页（内核代码段最后一页）
+	LW R1 R4 0x0000
+	SW R0 R4 0x000E
+	
+	; 把触发异常的页表项指向新页
+	LI R4 0x0080
+	SLL R4 R4 0x0000
+	SUBU R3 R4 R3
+	SLL R3 R3 0x0007
+	ADDIU R3 0x0007		; 增加页属性 W U P
+	SW R1 R3 0x0000
+
+	; 刷新TLB
+	0x8007			; MTPD R0
+
+	; 复制页内容
+	LI R3 0x0038
+	SLL R3 R3 0x0000	; R3 - 源地址
+	
+	LW_SP R4 0x0008		; R4- Addr
+	LI R5 0x00FC
+	SLL R5 R5 0x0000
+	AND R4 R5		; R4 - 目的地址
+
+	LI R5 0x0004
+	SLL R5 R5 0x0000	; R5 - 计数器
+DO_PAGE_FAULT_COPY_WORD:
+	LW R3 R6 0x0000
+	SW R4 R6 0x0000
+
+	ADDIU R3 0x0001
+	ADDIU R4 0x0001	
+	ADDIU R5 0xFFFF
+	BNEZ R5 DO_PAGE_FAULT_COPY_WORD
+
+	; 还原0x0E页表项内容 <= '0x0709'
+	LI R3 0x0007
+	SLL R3 R3 0x0000
+	LI R4 0x0009
+	ADDU R3 R4 R3
+	SW R0 R3 0x000E
+
+	; 刷新TLB
+	0x8007			; MTPD R0
+	
+DO_PAGE_FAULT_MODIFY:
+	LW R1 R2 0x0000
+	LI R3 0x0004
+	OR R2 R3
+	SW R1 R2 0x0000
+
+	B RET_FROM_INT
