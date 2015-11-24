@@ -13,6 +13,8 @@ entity control is
         pcIn        : in std_logic_vector(15 downto 0);
         opIn        : in std_logic_vector(4 downto 0);
         comBody     : in std_logic_vector(10 downto 0);
+        bubble      : in std_logic;
+        rdPcWrite   : in std_logic;
 
         -- im
         immEx       : out std_logic;
@@ -29,13 +31,22 @@ entity control is
         -- reg
         regDst      : out std_logic_vector(1 downto 0);
         regWrite    : out std_logic_vector(2 downto 0));
+        -- pc, linked to IF
+        pcWriteOut     : out std_logic;
+        rdPcWriteOut : out std_logic;
 end control;
 
 architecture behavior of control is
 begin
     -- decide control signals according to instructions
-    getConSig: process(opIn, comBody)
+    getConSig: process(opIn, comBody, rdPcWrite)
     begin
+        if rdPcWrite = "0" then
+            pcWriteOut <= "0";
+            rdPcWriteOut <= "1";
+        else
+            -- nothing
+        end if;
         immEx   <= "0";         immSrc <= Imms_00;
         memRead <= "0";         memToReg <= "0";
         regWrite <= Regw_NO;
@@ -119,12 +130,14 @@ begin
                 immEx <= "1";       immSrc <= Imms_40;
                 aluOp <= ADDU_;
                 memRead <= "1";     memToReg <= "1";
+                rdPcWriteOut <= YES;  pcWriteOut <= NO;
             when "11011" =>
                 -- SW
                 immEx   <= "1";      immSrc   <= Imms_40;
                 aluSrcA <= Srca_A;   aluSrcB  <= Srcb_IM;  aluOp    <= ADD_;
                 memRead <= "0";      memToReg <= "0";      memWrite <= "1";     memData <= Memd_B;
                 regDst  <= Regd_SP;  regWrite <= Regw_NO;
+                rdPcWriteOut <= NO;  pcWriteOut <= NO;
             when "00110" =>
                 -- SLL
                 regDst  <= Regd_RX;  regWrite <= Regw_RD;
