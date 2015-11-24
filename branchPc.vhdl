@@ -3,6 +3,9 @@ USE IEEE.STD_LOGIC_1164.ALL;
 USE IEEE.STD_LOGIC_ARITH.ALL;
 USE IEEE.STD_LOGIC_UNSIGNED.ALL;
 
+-- author : dpatrickx
+-- ID : compute pc of jump instructions
+
 entity branchPc is
 	port(
 		pcIn : in std_logic_vector(15 downto 0);

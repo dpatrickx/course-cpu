@@ -2,6 +2,10 @@ LIBRARY IEEE;
 USE IEEE.STD_LOGIC_1164.ALL;
 USE IEEE.STD_LOGIC_ARITH.ALL;
 USE IEEE.STD_LOGIC_UNSIGNED.ALL;
+use my_data_types.ALL;
+
+-- author: dpatrickx
+-- ID : get control signals according to instructions
 
 entity control is
     port(
@@ -12,14 +16,15 @@ entity control is
         regDst : out std_logic_vector(1 downto 0)           := "00";
         regWrite : out std_logic_vector(2 downto 0)         := "000";
         memToReg : out std_logic                            := "0";
+        memRead : out std_logic                             := "0";
+        memWrite : out std_logic                            := "0";
+        memData : out std_logic;
         aluSrcA : out std_logic_vector(2 downto 0)          := "000";     -- not decided
         aluSrcB : out std_logic_vector(2 downto 0)          := "000";
         aluOp : out std_logic_vector(4 downto 0);           := "00000"-- not decided
-        memRead : out std_logic                             := "0";
-        memWrite : out std_logic                            := "0";
+
         pcWrite : out std_logic                             := "0";
-        pcSrc : out std_logic_vector(2 downto 0)            := "000";       -- not decided
-        pcWriteCond : out std_logic_vector(2 downto 0)      := "000"; -- not decided
+        pcSrc : out std_logic_vector(1 downto 0)            := "000";       -- not decided
         immEx : out std_logic                               := "0";
         immSrc : out std_logic_vector(2 downto 0)           := "000";
 
@@ -31,350 +36,262 @@ entity control is
         im : out std_logic_vector(15 downto 0)              := "0000000000000000";
         spVal : out std_logic_vector(15 downto 0)           := "0000000000000000";
         A : out std_logic_vector(15 downto 0)               := "0000000000000000";
-        B : out std_logic_vector(15 downto 0)               := "0000000000000000";
-        func1 : out std_logic_vector(4 downto 0)            := "00000";
-        func2 : out std_logic_vector(1 downto 0)            := "00");
+        B : out std_logic_vector(15 downto 0)               := "0000000000000000");
 end control;
 
 architecture behavior of control is
-constant ZERO_16 : std_logic_vector(15 downto 0) := "0000000000000000";
-constant ZERO_3 : std_logic_vector(15 downto 0) := "000";
+constant Srcb_PC : std_logic_vector(2 downto 0)  := "010";
+constant Srcb_IH : std_logic_vector(2 downto 0)  := "100";
+constant Srcb_SP : std_logic_vector(2 downto 0)  := "111";
+constant Srcb_B  : std_logic_vector(2 downto 0)  := "000";
+constant Srcb_IM : std_logic_vector(2 downto 0)  := "111";
+
+constant Srca_A  : std_logic_vector(2 downto 0)  := "0";
+constant Srca_IM : std_logic_vector(2 downto 0)  := "1";
+
+constant Regw_NO : std_logic_vector(2 downto 0)  := "000";
+constant Regw_RD : std_logic_vector(2 downto 0)  := "001";
+constant Regw_T  : std_logic_vector(2 downto 0)  := "011";
+constant Regw_IH : std_logic_vector(2 downto 0)  := "101";
+constant Regw_SP : std_logic_vector(2 downto 0)  := "010";
+
+constant Regd_RX  : std_logic_vector(1 downto 0)  := "00";
+constant Regd_RY  : std_logic_vector(1 downto 0)  := "01";
+constant Regd_RZ  : std_logic_vector(1 downto 0)  := "10";
+constant Regd_SP  : std_logic_vector(1 downto 0)  := "11";
+
+constant Imms_10  : std_logic_vector(2 downto 0)  := "000";
+constant Imms_70  : std_logic_vector(2 downto 0)  := "001";
+constant Imms_40  : std_logic_vector(2 downto 0)  := "010";
+constant Imms_30  : std_logic_vector(2 downto 0)  := "011";
+constant Imms_42  : std_logic_vector(2 downto 0)  := "100";
+constant Imms_00  : std_logic_vector(2 downto 0)  := "111";
+
+constant Pcs_NR   : std_logic_vector(1 downto 0)  := "00";
+constant Pcs_ID   : std_logic_vector(1 downto 0)  := "00";
+constant Pcs_RX   : std_logic_vector(1 downto 0)  := "00";
+
+constant Memd_A   : std_logic := "0";
+constant Memd_B   : std_logic := "1";
 begin
     -- get rd due to regDst
-    process(opIn, comBody)
+    getRd: process(regDst, comBody)
     begin
+        case regDst is
+            when Regd_RX =>
+                rd <= comBody(10 downto 8);
+            when Regd_RY =>
+                rd <= comBody(7 downto 5);
+            when Regd_RZ =>
+                rd <= comBody(4 downto 2);
+            when Regd_SP =>
+                rd <= ZERO_16;
+        end case;
+    end process;
+    -- get im due to immSrc
+    getIm: process(immSrc, comBody)
+    begin
+        case immSrc is
+            when Imms_10 =>
+                case comBody(10) is
+                    when "0" => im <= "00000" & comBody;
+                    when "1" => im <= "11111" & comBody;
+                end case;
+            when Imms_70 =>
+                case comBody(7) is
+                    when "0" => im <= ZERO_8 & comBody(7 downto 0);
+                    when "1" => im <= ONE_8  & comBody(7 downto 0);
+                end case;
+            when Imms_40 =>
+                case comBody(4) is
+                    when "0" => im <= ZERO_11 & comBody(4 downto 0);
+                    when "1" => im <= ONE_11  & comBody(4 downto 0);
+                end case;
+            when Imms_30 =>
+                case comBody(3) is
+                    when "0" => im <= ZERO_12 & comBody(3 downto 0);
+                    when "1" => im <= ONE_12  & comBody(3 downto 0);
+                end case;
+            when Imms_42 =>
+            -- only need to use last 3 bits
+                im <= ZERO_13 & comBody(4 downto 2);
+            when others =>
+                im <= ZERO_16;
+        end case;
+    end process;
+    -- decide control signals according to instructions
+    getConSig: process(opIn, comBody)
+    begin
+        immEx   <= "0";         immSrc <= Imms_00;
+        memRead <= "0";         memToReg <= "0";
+        regWrite <= Regw_NO;
         case opIn is
             -- NOP
             when "00001" =>
                 -- nothing
             when "11100" =>
-                if comBody(1 downto 0) = "01" then
-                    -- ADDU
-                    func2 <= "01";
-                    regDst <= "10";     regWrite <= "001";
-                    memToReg <= "1";    aluSrcA <= "000";
-                    aluSrcB <= "000";   aluOp <= "000";
-                    memRead <= "0";     memWrite <= "0";
-                    pcWrite <= "0";     pcSrc <= "0";
-                    immEx <= "0";       immSrc <= "000";
-                elsif comBody(1 downto 0) = "11" then
-                    -- SUBU
-                    func1 <= "00000";   func2 <= "11";
-                    regDst <= "10";     regWrite <= "001";
-                    memToReg <= "1";    aluSrcA <= "000";
-                    aluSrcB <= "000";   aluOp <= "000";
-                    memRead <= "0";     memWrite <= "0";
-                    pcWrite <= "0";     pcSrc <= "0";
-                    immEx <= "0";       immSrc <= "000";
-                end if;
+                -- ADDU SUBU
+                regDst  <= Regd_RZ;     regWrite <= Regw_RD;
+                aluSrcA <= Srca_A;      aluSrcB  <= Srcb_B;
+                case comBody(1 downto 0) is
+                    when "01" => aluOp <= ADDU_;
+                    when "11" => aluOp <= SUBU_;
+                    when others => aluOp <= "0000";
+                end case;
             when "11101" =>
-                if comBody(4 downto 0) = "01100" then
-                    -- AND
-                    func1 <= "01100";   func2 <= "00";
-                    regDst <= "00";     regWrite <= "001";
-                    memToReg <= "1";    aluSrcA <= "000";
-                    aluSrcB <= "000";   aluOp <= "000";
-                    memRead <= "0";     memWrite <= "0";
-                    pcWrite <= "0";     pcSrc <= "0";
-                    immEx <= "0";       immSrc <= "000";
-                elsif comBody(4 downto 0) = "01101" then
-                    -- OR
-                    func1 <= "01101";   func2 <= "00";
-                    regDst <= "00";     regWrite <= "001";
-                    memToReg <= "1";    aluSrcA <= "000";
-                    aluSrcB <= "000";   aluOp <= "000";
-                    memRead <= "0";     memWrite <= "0";
-                    pcWrite <= "0";     pcSrc <= "0";
-                    immEx <= "0";       immSrc <= "000";
-                elsif comBody(4 downto 0) = "01011" then
-                    -- NEG
-                    func1 <= "01011";   func2 <= "00";
-                    regDst <= "00";     regWrite <= "001";
-                    memToReg <= "1";    aluSrcA <= "000";
-                    aluSrcB <= "000";   aluOp <= "000";
-                    memRead <= "0";     memWrite <= "0";
-                    pcWrite <= "0";     pcSrc <= "0";
-                    immEx <= "0";       immSrc <= "000";
-                elsif comBody(4 downto 0) = "01111" then
-                    -- NOT
-                    func1 <= "01111";   func2 <= "00";
-                    regDst <= "00";     regWrite <= "001";
-                    memToReg <= "1";    aluSrcA <= "000";
-                    aluSrcB <= "000";   aluOp <= "000";
-                    memRead <= "0";     memWrite <= "0";
-                    pcWrite <= "0";     pcSrc <= "0";
-                    immEx <= "0";       immSrc <= "000";
-                elsif comBody(4 downto 0) = "01010" then
-                    -- CMP
-                    func1 <= "01010";   func2 <= "00";
-                    regDst <= "11";     regWrite <= "011";
-                    memToReg <= "1";    aluSrcA <= "000";
-                    aluSrcB <= "000";   aluOp <= "000";
-                    memRead <= "0";     memWrite <= "0";
-                    pcWrite <= "0";     pcSrc <= "0";
-                    immEx <= "0";       immSrc <= "000";
-                end if;
+                -- AND OR NEG NOT CMP
+                regDst  <= Regd_RX;     regWrite <= Regw_RD;
+                aluSrcA <= Srca_A;      aluSrcB  <= Srcb_B;
+                case comBody(4 downto 0) is
+                    when "01100" => aluOp <= AND_;
+                    when "01101" => aluOp <= OR_;
+                    when "01011" => aluOp <= NEG_;
+                    when "01111" => aluOp <= NOT_;
+                    when "01010" => aluOp <= CMP_;
+                    when others  => aluOp <= "0000";
+                end case;
             when "01111" =>
                 -- MOVE
-                func1 <= "00000";   func2 <= "00";
-                regDst <= "00";     regWrite <= "001";
-                memToReg <= "1";    aluSrcA <= "000";
-                aluSrcB <= "000";   aluOp <= "000";
-                memRead <= "0";     memWrite <= "0";
-                pcWrite <= "0";     pcSrc <= "0";
-                immEx <= "0";       immSrc <= "000";
+                regDst  <= Regd_RX;     regWrite <= Regw_RD;
+                aluSrcA <= Srca_A;      aluSrcB  <= Srcb_B;
+                aluOp <= PASSB_;
             when "11101" =>
                 -- MFPC
-                func1 <= "00000";   func2 <= "00";
-                regDst <= "00";     regWrite <= "001";
-                memToReg <= "1";    aluSrcA <= "000";
-                aluSrcB <= "010";   aluOp <= "000";
-                memRead <= "0";     memWrite <= "0";
-                pcWrite <= "0";     pcSrc <= "0";
-                immEx <= "0";       immSrc <= "000";
+                regDst  <= Regd_RX;     regWrite <= Regw_RD;
+                aluSrcA <= Srca_A;      aluSrcB  <= Srcb_PC;
+                aluOp   <= PASSB_;
             when "11110" =>
-                if comBody(0) = "0" then
+                case comBody(0) is
+                when "0" =>
                     -- MFIH
-                    func1 <= "00000";   func2 <= "00";
-                    regDst <= "00";     regWrite <= "001";
-                    memToReg <= "1";    aluSrcA <= "000";
-                    aluSrcB <= "100";   aluOp <= "000";
-                    memRead <= "0";     memWrite <= "0";
-                    pcWrite <= "0";     pcSrc <= "0";
-                    immEx <= "0";       immSrc <= "000";
-                elsif comBody(0) = "1" then
+                    regDst  <= Regd_RX;     regWrite <= Regw_RD;
+                    aluSrcA <= Srca_A;      aluSrcB  <= Srcb_IH;
+                    aluOp   <= PASSB_;
+                when "1" =>
                     -- MTIH
-                    func1 <= "00000";   func2 <= "00";
-                    regDst <= "11";     regWrite <= "101";
-                    memToReg <= "1";    aluSrcA <= "000";
-                    aluSrcB <= "101";   aluOp <= "000";
-                    memRead <= "0";     memWrite <= "0";
-                    pcWrite <= "0";     pcSrc <= "0";
-                    immEx <= "0";       immSrc <= "000";
-                end if;
+                    regDst  <= Regd_SP;     regWrite <= Regw_IH;
+                    aluSrcA <= Srca_A;      aluSrcB  <= Srcb_B;
+                    aluOp   <= PASSA_;
+                end case;
             when "01100" =>
                 if comBody(10 downto 8) == "100" then
                     -- MTSP
-                    func1 <= "00000";   func2 <= "00";
-                    regDst <= "11";     regWrite <= "010";
-                    memToReg <= "1";    aluSrcA <= "000";
-                    aluSrcB <= "000";   aluOp <= "000";
-                    memRead <= "0";     memWrite <= "0";
-                    pcWrite <= "0";     pcSrc <= "0";
-                    immEx <= "0";       immSrc <= "000";
+                    regDst  <= Regd_SP;     regWrite <= Regw_SP;
+                    aluSrcA <= Srca_A;      aluSrcB  <= Srcb_B;
+                    aluOp   <= PASSA_;
                 elsif comBody(10 downto 8) == "011" then
                     -- ADDSP
-                    func1 <= "00000";   func2 <= "00";
-                    regDst <= "11";     regWrite <= "010";
-                    memToReg <= "1";    aluSrcA <= "000";
-                    aluSrcB <= "000";   aluOp <= "000";
-                    memRead <= "0";     memWrite <= "0";
-                    pcWrite <= "0";     pcSrc <= "0";
-                    immEx <= "0";       immSrc <= "000";
+                    immEx   <= "1";      immSrc   <= Imms_70;
+                    aluSrcA <= Srca_IM;  aluSrcB  <= Srcb_SP;  aluOp    <= ADD_;
+                    memRead <= "0";      memToReg <= "0";      memWrite <= "0";     memData <= Memd_A;
+                    regDst  <= Regd_SP;  regWrite <= Regw_SP;
                 elsif comBody(10 downto 8) == "000" then
                     -- BTEQZ
-                    func1 <= "00000";   func2 <= "00";
-                    regDst <= "11";     regWrite <= "010";
-                    memToReg <= "1";    aluSrcA <= "000";
-                    aluSrcB <= "000";   aluOp <= "000";
-                    memRead <= "0";     memWrite <= "0";
-                    pcWrite <= "0";     pcSrc <= "0";
-                    immEx <= "0";       immSrc <= "000";
+                    immEx   <= "1";      immSrc   <= Imms_70;
+                    aluSrcA <= Srca_A;   aluSrcB  <= Srca_B;   aluOp     <= PASSA_;
+                    memRead <= "0";      memToReg <= "0";      memWrite  <= "0";     memData <= Memd_A;
+                    regDst  <= Regd_SP;  regWrite <= Regw_NO;
+                    pcSrc   <= Pcs_ID;
                 end if;
             when "01000" =>
                 -- ADDIU3
-                func1 <= "00000";   func2 <= "00";
-                regDst <= "01";     regWrite <= "001";
-                memToReg <= "1";    aluSrcA <= "000";
-                aluSrcB <= "001";   aluOp <= "000";
-                memRead <= "0";     memWrite <= "0";
-                pcWrite <= "0";     pcSrc <= "0";
-                immEx <= "1";       immSrc <= "011";
+                regDst <= Regd_RY;  regWrite <= Regw_RD;
+                aluSrcA <= Srca_A;  aluSrcB <= Srcb_IM;
+                immEx <= "1";       immSrc <= Imms_30;
+                aluOp <= ADDU_;
             when "10011" =>
                 -- LW
-                func1 <= "00000";   func2 <= "00";
-                regDst <= "01";     regWrite <= "001";
-                memToReg <= "0";    aluSrcA <= "000";
-                aluSrcB <= "001";   aluOp <= "000";
-                memRead <= "1";     memWrite <= "0";
-                pcWrite <= "0";     pcSrc <= "0";
-                immEx <= "1";       immSrc <= "010";
+                regDst <= Regd_RY;  regWrite <= Regw_RD;
+                immEx <= "1";       immSrc <= Imms_40;
+                aluOp <= ADDU_;
+                memRead <= "1";     memToReg <= "1";
             when "11011" =>
                 -- SW
-                func1 <= "00000";   func2 <= "00";
-                regDst <= "00";     regWrite <= "000";
-                memToReg <= "0";    aluSrcA <= "000";
-                aluSrcB <= "001";   aluOp <= "000";
-                memRead <= "0";     memWrite <= "1";
-                pcWrite <= "0";     pcSrc <= "0";
-                immEx <= "1";       immSrc <= "010";
+                immEx   <= "1";      immSrc   <= Imms_40;
+                aluSrcA <= Srca_A;   aluSrcB  <= Srcb_IM;  aluOp    <= ADD_;
+                memRead <= "0";      memToReg <= "0";      memWrite <= "1";     memData <= Memd_B;
+                regDst  <= Regd_SP;  regWrite <= Regw_NO;
             when "00110" =>
                 -- SLL
-                func1 <= "00000";   func2 <= "00";
-                regDst <= "00";     regWrite <= "001";
-                memToReg <= "1";    aluSrcA <= "000";
-                aluSrcB <= "001";   aluOp <= "000";
-                memRead <= "0";     memWrite <= "0";
-                pcWrite <= "0";     pcSrc <= "0";
-                immEx <= "0";       immSrc <= "100";
+                regDst  <= Regd_RX;  regWrite <= Regw_RD;
+                aluSrcA <= Srca_IM;  aluSrcB  <= Srcb_B;
+                immEx <= "0";        immSrc   <= Imms_42;
+                aluOp <= SLL_;
             when "00110" =>
                 if comBody(1 downto 0) = "11" then
                     -- SRA
-                    func1 <= "00000";   func2 <= "11";
-                    regDst <= "00";     regWrite <= "001";
-                    memToReg <= "1";    aluSrcA <= "000";
-                    aluSrcB <= "001";   aluOp <= "000";
-                    memRead <= "0";     memWrite <= "0";
-                    pcWrite <= "0";     pcSrc <= "0";
-                    immEx <= "0";       immSrc <= "100";
+                    regDst  <= Regd_RX;  regWrite <= Regw_RD;
+                    aluSrcA <= Srca_IM;  aluSrcB  <= Srcb_B;
+                    immEx <= "0";        immSrc   <= Imms_42;
+                    aluOp <= SRA_;
                 elsif comBody(1 downto 0) = "10" then
                     -- SRL
-                    func1 <= "00000";   func2 <= "11";
-                    regDst <= "00";     regWrite <= "001";
-                    memToReg <= "1";    aluSrcA <= "000";
-                    aluSrcB <= "001";   aluOp <= "000";
-                    memRead <= "0";     memWrite <= "0";
-                    pcWrite <= "0";     pcSrc <= "0";
-                    immEx <= "0";       immSrc <= "100";
+                    regDst  <= Regd_RX;  regWrite <= Regw_RD;
+                    aluSrcA <= Srca_IM;  aluSrcB  <= Srcb_B;
+                    immEx <= "0";        immSrc   <= Imms_42;
+                    aluOp <= SRL_;
+                else
+                    -- nothing
                 end if;
             when "01001" =>
                 -- ADDIU
-                func1 <= "00000";   func2 <= "11";
-                regDst <= "00";     regWrite <= "001";
-                memToReg <= "1";    aluSrcA <= "000";
-                aluSrcB <= "001";   aluOp <= "000";
-                memRead <= "0";     memWrite <= "0";
-                pcWrite <= "0";     pcSrc <= "0";
-                immEx <= "0";       immSrc <= "100";
+                regDst  <= Regd_RX;  regWrite <= Regw_RD;
+                immEx   <= "1";      immSrc   <= Imms_70;
+                aluSrcA <= Srca_A;   aluSrcB  <= Srcb_IM;
+                aluOp   <= ADDU_;
             when "01110" =>
                 -- CMPI
-                func1 <= "00000";   func2 <= "11";
-                regDst <= "00";     regWrite <= "001";
-                memToReg <= "1";    aluSrcA <= "000";
-                aluSrcB <= "001";   aluOp <= "000";
-                memRead <= "0";     memWrite <= "0";
-                pcWrite <= "0";     pcSrc <= "0";
-                immEx <= "0";       immSrc <= "100";
+                regDst  <= Regd_SP;  regWrite <= Regw_T;
+                immEx   <= "1";      immSrc   <= Imms_70;
+                aluSrcA <= Srca_A;   aluSrcB  <= Srcb_IM;
+                aluOp   <= CMP_;
             when "01101" =>
                 -- LI
-                func1 <= "00000";   func2 <= "11";
-                regDst <= "00";     regWrite <= "001";
-                memToReg <= "1";    aluSrcA <= "000";
-                aluSrcB <= "001";   aluOp <= "000";
-                memRead <= "0";     memWrite <= "0";
-                pcWrite <= "0";     pcSrc <= "0";
-                immEx <= "0";       immSrc <= "100";
+                regDst  <= Regd_RX;  regWrite <= Regw_RD;
+                immEx   <= "0";      immSrc   <= Imms_70;
+                aluSrcA <= Srca_A;   aluSrcB  <= Srcb_IM;
+                aluOp   <= PASSB_;
             when "10010" =>
                 -- LW_SP
-                func1 <= "00000";   func2 <= "11";
-                regDst <= "00";     regWrite <= "001";
-                memToReg <= "1";    aluSrcA <= "000";
-                aluSrcB <= "001";   aluOp <= "000";
-                memRead <= "0";     memWrite <= "0";
-                pcWrite <= "0";     pcSrc <= "0";
-                immEx <= "0";       immSrc <= "100";
+                immEx   <= "1";      immSrc   <= Imms_70;
+                aluSrcA <= Srca_IM;  aluSrcB  <= Srcb_SP;  aluOp    <= ADD_;
+                memRead <= "1";      memToReg <= "1";      memWrite <= "0";
+                regDst  <= Regd_RX;  regWrite <= Regw_RD;
             when "11010" =>
                 -- SW_SP
-                func1 <= "00000";   func2 <= "11";
-                regDst <= "00";     regWrite <= "001";
-                memToReg <= "1";    aluSrcA <= "000";
-                aluSrcB <= "001";   aluOp <= "000";
-                memRead <= "0";     memWrite <= "0";
-                pcWrite <= "0";     pcSrc <= "0";
-                immEx <= "0";       immSrc <= "100";
+                immEx   <= "1";      immSrc   <= Imms_70;
+                aluSrcA <= Srca_IM;  aluSrcB  <= Srcb_SP;  aluOp    <= ADD_;
+                memRead <= "0";      memToReg <= "0";      memWrite <= "1";     memData <= Memd_A;
+                regDst  <= Regd_SP;  regWrite <= Regw_NO;
             when "00010" =>
                 -- B
-                func1 <= "00000";   func2 <= "11";
-                regDst <= "00";     regWrite <= "001";
-                memToReg <= "1";    aluSrcA <= "000";
-                aluSrcB <= "001";   aluOp <= "000";
-                memRead <= "0";     memWrite <= "0";
-                pcWrite <= "0";     pcSrc <= "0";
-                immEx <= "0";       immSrc <= "100";
+                immEx   <= "1";      immSrc   <= Imms_10;
+                aluSrcA <= Srca_A;  aluSrcB   <= Srca_B;   aluOp    <= PASSA_;
+                memRead <= "0";      memToReg <= "0";      memWrite <= "0";     memData <= Memd_A;
+                regDst  <= Regd_SP;  regWrite <= Regw_NO;
+                pcSrc   <= Pcs_ID;
             when "00100" =>
                 -- BEQZ
-                func1 <= "00000";   func2 <= "11";
-                regDst <= "00";     regWrite <= "001";
-                memToReg <= "1";    aluSrcA <= "000";
-                aluSrcB <= "001";   aluOp <= "000";
-                memRead <= "0";     memWrite <= "0";
-                pcWrite <= "0";     pcSrc <= "0";
-                immEx <= "0";       immSrc <= "100";
+                immEx   <= "1";      immSrc   <= Imms_70;
+                aluSrcA <= Srca_A;   aluSrcB  <= Srca_B;   aluOp     <= PASSA_;
+                memRead <= "0";      memToReg <= "0";      memWrite  <= "0";     memData <= Memd_A;
+                regDst  <= Regd_SP;  regWrite <= Regw_NO;
+                pcSrc   <= Pcs_ID;
             when "00101" =>
                 -- BNEZ
-                func1 <= "00000";   func2 <= "11";
-                regDst <= "00";     regWrite <= "001";
-                memToReg <= "1";    aluSrcA <= "000";
-                aluSrcB <= "001";   aluOp <= "000";
-                memRead <= "0";     memWrite <= "0";
-                pcWrite <= "0";     pcSrc <= "0";
-                immEx <= "0";       immSrc <= "100";
+                immEx   <= "1";      immSrc   <= Imms_70;
+                aluSrcA <= Srca_A;   aluSrcB  <= Srca_B;   aluOp     <= PASSA_;
+                memRead <= "0";      memToReg <= "0";      memWrite  <= "0";     memData <= Memd_A;
+                regDst  <= Regd_SP;  regWrite <= Regw_NO;
+                pcSrc   <= Pcs_ID;
             when "11101" =>
                 -- JR
-                func1 <= "00000";   func2 <= "11";
-                regDst <= "00";     regWrite <= "001";
-                memToReg <= "1";    aluSrcA <= "000";
-                aluSrcB <= "001";   aluOp <= "000";
-                memRead <= "0";     memWrite <= "0";
-                pcWrite <= "0";     pcSrc <= "0";
-                immEx <= "0";       immSrc <= "100";
+                immEx   <= "1";      immSrc   <= Imms_00;
+                aluSrcA <= Srca_A;   aluSrcB  <= Srca_B;   aluOp     <= PASSA_;
+                memRead <= "0";      memToReg <= "0";      memWrite  <= "0";     memData <= Memd_A;
+                regDst  <= Regd_SP;  regWrite <= Regw_NO;
+                pcSrc   <= Pcs_RX;
         end case;
     end process;
-    process(regDst, comBody)
-    begin
-        case regDst is
-            when "00" =>
-                rd <= comBody(10 downto 8);
-            when "01" =>
-                rd <= comBody(7 downto 5);
-            when "10" =>
-                rd <= comBody(4 downto 2);
-            when "11" =>
-                rd <= "0000000000000000";
-        end case;
-    end process;
-    -- get im due to immSrc
-    process(immSrc, comBody)
-    begin
-        case immSrc is
-            when "000" =>
-                if comBody(10) == "0"
-                    im <= "00000" & comBody;
-                else
-                    im <= "11111" & comBody;
-                end if;
-            when "001" =>
-                if comBody(7) == "0"
-                    im <= "00000000" & comBody(7 downto 0);
-                else
-                    im <= "11111111" & comBody(7 downto 0);
-                end if;
-            when "010" =>
-                if comBody(4) == "0"
-                    im <= "00000000000" & comBody(4 downto 0);
-                else
-                    im <= "11111111111" & comBody(4 downto 0);
-                end if;
-            when "011" =>
-                if comBody(3) == "0"
-                    im <= "000000000000" & comBody(3 downto 0);
-                else
-                    im <= "111111111111" & comBody(3 downto 0);
-                end if;
-            when "100" =>
-            -- only need to use last 3 bits
-                im <= "0000000000000" & comBody(4 downto 2);
-            when others =>
-                im <= "0000000000000000";
-        end case;
-    end process;
-    -- get other parts which dont need any control signal
-    -- func1, func2, pcOut
-    process(comBody, pcIn opIn)
-    begin
-        func1 <= comBody(4 downto 0);
-        func2 <= comBody(2 downto 0);
-        pcOut <= pcIn;
-        opOut <= opIn;
-    end process;
+
 end behavior;
