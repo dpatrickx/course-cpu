@@ -4,7 +4,7 @@ use IEEE.STD_LOGIC_ARITH.ALL;
 use IEEE.STD_LOGIC_UNSIGNED.ALL;
 
 entity ALU is
-    Port ( op : in  STD_LOGIC_VECTOR (3 downto 0);
+    Port ( aluOp : in  STD_LOGIC_VECTOR (3 downto 0);
            input_A : in  STD_LOGIC_VECTOR (15 downto 0);
            input_B : in  STD_LOGIC_VECTOR (15 downto 0);
            output : out  STD_LOGIC_VECTOR (15 downto 0));
@@ -12,9 +12,9 @@ end ALU;
 
 architecture Behavioral of ALU is
 begin
-	process(op, input_A, input_B)
+	process(aluOp, input_A, input_B)
 	begin
-		case op is
+		case aluOp is
 			when "0000" =>
 				output <= input_A + input_B;
 			when "0001" =>
