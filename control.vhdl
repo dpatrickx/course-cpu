@@ -10,33 +10,33 @@ use my_data_types.ALL;
 
 entity control is
     port(
-        pcIn: in std_logic_vector(15 downto 0);
-        opIn: in std_logic_vector(4 downto 0);
-        comBody: in std_logic_vector(10 downto 0);
+        pcIn        : in std_logic_vector(15 downto 0);
+        opIn        : in std_logic_vector(4 downto 0);
+        comBody     : in std_logic_vector(10 downto 0);
 
-        regDst : out std_logic_vector(1 downto 0)           := "00";
-        regWrite : out std_logic_vector(2 downto 0)         := "000";
-        memToReg : out std_logic                            := "0";
-        memRead : out std_logic                             := "0";
-        memWrite : out std_logic                            := "0";
-        memData : out std_logic;
-        aluSrcA : out std_logic_vector(2 downto 0)          := "000";     -- not decided
-        aluSrcB : out std_logic_vector(2 downto 0)          := "000";
-        aluOp : out std_logic_vector(4 downto 0);           := "00000"-- not decided
-        pcWrite : out std_logic                             := "0";
-        pcSrc : out std_logic_vector(1 downto 0)            := "000";       -- not decided
-        immEx : out std_logic                               := "0";
-        immSrc : out std_logic_vector(2 downto 0)           := "000";
+        regDst      : out std_logic_vector(1 downto 0);
+        regWrite    : out std_logic_vector(2 downto 0);
+        memToReg    : out std_logic;
+        memRead     : out std_logic;
+        memWrite    : out std_logic;
+        memData     : out std_logic;
+        aluSrcA     : out std_logic_vector(2 downto 0);
+        aluSrcB     : out std_logic_vector(2 downto 0);
+        aluOp       : out std_logic_vector(4 downto 0);
+        pcWrite     : out std_logic;
+        pcSrc       : out std_logic_vector(1 downto 0);
+        immEx       : out std_logic;
+        immSrc      : out std_logic_vector(2 downto 0);
 
-        pcOut: out std_logic_vector(15 downto 0)            := "0000000000000000";
-        opOut : out std_logic_vector(4 downto 0)            := "00000";
-        rd : out std_logic_vector(2 downto 0)               := "000";
-        rs : out std_logic_vector(2 downto 0)               := "000";
-        rt : out std_logic_vector(2 downto 0)               := "000";
-        im : out std_logic_vector(15 downto 0)              := "0000000000000000";
-        spVal : out std_logic_vector(15 downto 0)           := "0000000000000000";
-        A : out std_logic_vector(15 downto 0)               := "0000000000000000";
-        B : out std_logic_vector(15 downto 0)               := "0000000000000000");
+        pcOut       : out std_logic_vector(15 downto 0);
+        opOut       : out std_logic_vector(4 downto 0);
+        rd          : out std_logic_vector(2 downto 0);
+        rs          : out std_logic_vector(2 downto 0);
+        rt          : out std_logic_vector(2 downto 0);
+        im          : out std_logic_vector(15 downto 0);
+        spVal       : out std_logic_vector(15 downto 0);
+        A           : out std_logic_vector(15 downto 0);
+        B           : out std_logic_vector(15 downto 0);
 end control;
 
 architecture behavior of control is

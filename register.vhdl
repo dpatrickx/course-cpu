@@ -9,10 +9,10 @@ use my_data_types.ALL;
 
 entity register is
 	port(
-		regWrite : in std_logic_vector(2 downto 0);
+		regWrite 	: in std_logic_vector(2 downto 0);
 		regWriteAdd : in std_logic_vector(2 downto 0); -- addr of rd
-		data : in std_logic_vector(15 downto 0);
-		op : in std_logic_vector(4 downto 0);
+		data 		: in std_logic_vector(15 downto 0);
+		op 			: in std_logic_vector(4 downto 0);
 		instruction : in std_logic_vector(15 downto 0);
 
 		regT : inout std_logic_vector(15 downto 0);
