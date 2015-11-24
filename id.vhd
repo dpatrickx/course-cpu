@@ -36,6 +36,7 @@ entity id is
 end id;
 
 architecture behavior of id is
+begin
     pcOut <= pcIn;
     opOut <= opIn;
     rs <= instBody(10 downto 8);
@@ -51,7 +52,9 @@ architecture behavior of id is
             when Regd_RZ =>
                 rd <= instBody(4 downto 2);
             when Regd_SP =>
-                rd <= ZERO_16;
+                rd <= ZERO_3;
+			   when others =>
+				    -- nothing
         end case;
     end process;
     -- im
@@ -60,23 +63,27 @@ architecture behavior of id is
         case immSrc is
             when Imms_10 =>
                 case instBody(10) is
-                    when "0" => im <= "00000" & instBody;
-                    when "1" => im <= "11111" & instBody;
+                    when '0' => im <= "00000" & instBody;
+                    when '1' => im <= "11111" & instBody;
+						  when others => -- nothing
                 end case;
             when Imms_70 =>
                 case instBody(7) is
-                    when "0" => im <= ZERO_8 & instBody(7 downto 0);
-                    when "1" => im <= ONE_8  & instBody(7 downto 0);
+                    when '0' => im <= ZERO_8 & instBody(7 downto 0);
+                    when '1' => im <= ONE_8  & instBody(7 downto 0);
+						  when others => -- nothing
                 end case;
             when Imms_40 =>
                 case instBody(4) is
-                    when "0" => im <= ZERO_11 & instBody(4 downto 0);
-                    when "1" => im <= ONE_11  & instBody(4 downto 0);
+                    when '0' => im <= ZERO_11 & instBody(4 downto 0);
+                    when '1' => im <= ONE_11  & instBody(4 downto 0);
+						  when others => -- nothing
                 end case;
             when Imms_30 =>
                 case instBody(3) is
-                    when "0" => im <= ZERO_12 & instBody(3 downto 0);
-                    when "1" => im <= ONE_12  & instBody(3 downto 0);
+                    when '0' => im <= ZERO_12 & instBody(3 downto 0);
+                    when '1' => im <= ONE_12  & instBody(3 downto 0);
+						  when others => -- nothing
                 end case;
             when Imms_42 =>
             -- only need to use last 3 bits
@@ -85,4 +92,4 @@ architecture behavior of id is
                 im <= ZERO_16;
         end case;
     end process;
-begin
+end behavior;

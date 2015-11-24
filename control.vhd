@@ -20,9 +20,9 @@ entity control is
         immEx       : out std_logic;
         immSrc      : out std_logic_vector(2 downto 0);
         -- alu
-        aluSrcA     : out std_logic_vector(2 downto 0);
+        aluSrcA     : out std_logic;
         aluSrcB     : out std_logic_vector(2 downto 0);
-        aluOp       : out std_logic_vector(4 downto 0);
+        aluOp       : out std_logic_vector(3 downto 0);
         -- mem
         memToReg    : out std_logic;
         memRead     : out std_logic;
@@ -30,10 +30,10 @@ entity control is
         memData     : out std_logic;
         -- reg
         regDst      : out std_logic_vector(1 downto 0);
-        regWrite    : out std_logic_vector(2 downto 0));
+        regWrite    : out std_logic_vector(2 downto 0);
         -- pc, linked to IF
         pcWriteOut     : out std_logic;
-        rdPcWriteOut : out std_logic;
+        rdPcWriteOut : out std_logic);
 end control;
 
 architecture behavior of control is
@@ -41,14 +41,14 @@ begin
     -- decide control signals according to instructions
     getConSig: process(opIn, comBody, rdPcWrite)
     begin
-        if rdPcWrite = "0" then
-            pcWriteOut <= "0";
-            rdPcWriteOut <= "1";
+        if rdPcWrite = '0' then
+            pcWriteOut <= '0';
+            rdPcWriteOut <= '1';
         else
             -- nothing
         end if;
-        immEx   <= "0";         immSrc <= Imms_00;
-        memRead <= "0";         memToReg <= "0";
+        immEx   <= '0';         immSrc <= Imms_00;
+        memRead <= '0';         memToReg <= '0';
         regWrite <= Regw_NO;
         case opIn is
             -- NOP
@@ -59,8 +59,8 @@ begin
                 regDst  <= Regd_RZ;     regWrite <= Regw_RD;
                 aluSrcA <= Srca_A;      aluSrcB  <= Srcb_B;
                 case comBody(1 downto 0) is
-                    when "01" => aluOp <= ADDU_;
-                    when "11" => aluOp <= SUBU_;
+                    when "01" => aluOp <= ADDU_a;
+                    when "11" => aluOp <= SUBU_a;
                     when others => aluOp <= "0000";
                 end case;
             when "11101" =>
@@ -68,156 +68,156 @@ begin
                 regDst  <= Regd_RX;     regWrite <= Regw_RD;
                 aluSrcA <= Srca_A;      aluSrcB  <= Srcb_B;
                 case comBody(4 downto 0) is
-                    when "01100" => aluOp <= AND_;
-                    when "01101" => aluOp <= OR_;
-                    when "01011" => aluOp <= NEG_;
-                    when "01111" => aluOp <= NOT_;
-                    when "01010" => aluOp <= CMP_;
+                    when "01100" => aluOp <= AND_a;
+                    when "01101" => aluOp <= OR_a;
+                    when "01011" => aluOp <= NEG_a;
+                    when "01111" => aluOp <= NOT_a;
+                    when "01010" => aluOp <= CMP_a;
                     when others  => aluOp <= "0000";
                 end case;
+                     case comBody(7 downto 0) is
+                        when "01000000" =>
+                            regDst  <= Regd_RX;     regWrite <= Regw_RD;
+                            aluSrcA <= Srca_A;      aluSrcB  <= Srcb_PC;
+                            aluOp   <= PASSB_a;
+                        when "00000000" =>
+                        -- JR
+                            immEx   <= '1';      immSrc   <= Imms_00;
+                            aluSrcA <= Srca_A;   aluSrcB  <= Srcb_B;   aluOp     <= PASSA_a;
+                            memRead <= '0';      memToReg <= '0';      memWrite  <= '0';     memData <= Memd_A;
+                            regDst  <= Regd_SP;  regWrite <= Regw_NO;
+                        when others => --nothing
+                    end case;
             when "01111" =>
                 -- MOVE
                 regDst  <= Regd_RX;     regWrite <= Regw_RD;
                 aluSrcA <= Srca_A;      aluSrcB  <= Srcb_B;
-                aluOp <= PASSB_;
-            when "11101" =>
-                -- MFPC
-                regDst  <= Regd_RX;     regWrite <= Regw_RD;
-                aluSrcA <= Srca_A;      aluSrcB  <= Srcb_PC;
-                aluOp   <= PASSB_;
+                aluOp <= PASSB_a;
             when "11110" =>
                 case comBody(0) is
-                when "0" =>
+                when '0' =>
                     -- MFIH
                     regDst  <= Regd_RX;     regWrite <= Regw_RD;
                     aluSrcA <= Srca_A;      aluSrcB  <= Srcb_IH;
-                    aluOp   <= PASSB_;
-                when "1" =>
+                    aluOp   <= PASSB_a;
+                when '1' =>
                     -- MTIH
                     regDst  <= Regd_SP;     regWrite <= Regw_IH;
                     aluSrcA <= Srca_A;      aluSrcB  <= Srcb_B;
-                    aluOp   <= PASSA_;
+                    aluOp   <= PASSA_a;
+                     when others => --nothing
                 end case;
             when "01100" =>
-                if comBody(10 downto 8) == "100" then
+                if comBody(10 downto 8) = "100" then
                     -- MTSP
                     regDst  <= Regd_SP;     regWrite <= Regw_SP;
                     aluSrcA <= Srca_A;      aluSrcB  <= Srcb_B;
-                    aluOp   <= PASSA_;
-                elsif comBody(10 downto 8) == "011" then
+                    aluOp   <= PASSA_a;
+                elsif comBody(10 downto 8) = "011" then
                     -- ADDSP
-                    immEx   <= "1";      immSrc   <= Imms_70;
-                    aluSrcA <= Srca_IM;  aluSrcB  <= Srcb_SP;  aluOp    <= ADD_;
-                    memRead <= "0";      memToReg <= "0";      memWrite <= "0";     memData <= Memd_A;
+                    immEx   <= '1';      immSrc   <= Imms_70;
+                    aluSrcA <= Srca_IM;  aluSrcB  <= Srcb_SP;  aluOp    <= ADDU_a;
+                    memRead <= '0';      memToReg <= '0';      memWrite <= '0';     memData <= Memd_A;
                     regDst  <= Regd_SP;  regWrite <= Regw_SP;
-                elsif comBody(10 downto 8) == "000" then
+                elsif comBody(10 downto 8) = "000" then
                     -- BTEQZ
-                    immEx   <= "1";      immSrc   <= Imms_70;
-                    aluSrcA <= Srca_A;   aluSrcB  <= Srca_B;   aluOp     <= PASSA_;
-                    memRead <= "0";      memToReg <= "0";      memWrite  <= "0";     memData <= Memd_A;
+                    immEx   <= '1';      immSrc   <= Imms_70;
+                    aluSrcA <= Srca_A;   aluSrcB  <= Srcb_B;   aluOp     <= PASSA_a;
+                    memRead <= '0';      memToReg <= '0';      memWrite  <= '0';     memData <= Memd_A;
                     regDst  <= Regd_SP;  regWrite <= Regw_NO;
-                    pcSrc   <= Pcs_ID;
+                     else
+                        --nothing
                 end if;
             when "01000" =>
                 -- ADDIU3
                 regDst <= Regd_RY;  regWrite <= Regw_RD;
                 aluSrcA <= Srca_A;  aluSrcB <= Srcb_IM;
-                immEx <= "1";       immSrc <= Imms_30;
-                aluOp <= ADDU_;
+                immEx <= '1';       immSrc <= Imms_30;
+                aluOp <= ADDU_a;
             when "10011" =>
                 -- LW
                 regDst <= Regd_RY;  regWrite <= Regw_RD;
-                immEx <= "1";       immSrc <= Imms_40;
-                aluOp <= ADDU_;
-                memRead <= "1";     memToReg <= "1";
+                immEx <= '1';       immSrc <= Imms_40;
+                aluOp <= ADDU_a;
+                memRead <= '1';     memToReg <= '1';
                 rdPcWriteOut <= YES;  pcWriteOut <= NO;
             when "11011" =>
                 -- SW
-                immEx   <= "1";      immSrc   <= Imms_40;
-                aluSrcA <= Srca_A;   aluSrcB  <= Srcb_IM;  aluOp    <= ADD_;
-                memRead <= "0";      memToReg <= "0";      memWrite <= "1";     memData <= Memd_B;
+                immEx   <= '1';      immSrc   <= Imms_40;
+                aluSrcA <= Srca_A;   aluSrcB  <= Srcb_IM;  aluOp    <= ADDU_a;
+                memRead <= '0';      memToReg <= '0';      memWrite <= '1';     memData <= Memd_B;
                 regDst  <= Regd_SP;  regWrite <= Regw_NO;
                 rdPcWriteOut <= NO;  pcWriteOut <= NO;
-            when "00110" =>
-                -- SLL
-                regDst  <= Regd_RX;  regWrite <= Regw_RD;
-                aluSrcA <= Srca_IM;  aluSrcB  <= Srcb_B;
-                immEx <= "0";        immSrc   <= Imms_42;
-                aluOp <= SLL_;
             when "00110" =>
                 if comBody(1 downto 0) = "11" then
                     -- SRA
                     regDst  <= Regd_RX;  regWrite <= Regw_RD;
                     aluSrcA <= Srca_IM;  aluSrcB  <= Srcb_B;
-                    immEx <= "0";        immSrc   <= Imms_42;
-                    aluOp <= SRA_;
+                    immEx <= '0';        immSrc   <= Imms_42;
+                    aluOp <= SRA_a;
                 elsif comBody(1 downto 0) = "10" then
                     -- SRL
                     regDst  <= Regd_RX;  regWrite <= Regw_RD;
                     aluSrcA <= Srca_IM;  aluSrcB  <= Srcb_B;
-                    immEx <= "0";        immSrc   <= Imms_42;
-                    aluOp <= SRL_;
+                    immEx <= '0';        immSrc   <= Imms_42;
+                    aluOp <= SRL_a;
+                elsif comBody(1 downto 0) = "00" then
+                    -- SLL
+                    regDst  <= Regd_RX;  regWrite <= Regw_RD;
+                    aluSrcA <= Srca_IM;  aluSrcB  <= Srcb_B;
+                    immEx <= '0';        immSrc   <= Imms_42;
+                    aluOp <= SLL_a;
                 else
                     -- nothing
                 end if;
             when "01001" =>
                 -- ADDIU
                 regDst  <= Regd_RX;  regWrite <= Regw_RD;
-                immEx   <= "1";      immSrc   <= Imms_70;
+                immEx   <= '1';      immSrc   <= Imms_70;
                 aluSrcA <= Srca_A;   aluSrcB  <= Srcb_IM;
-                aluOp   <= ADDU_;
+                aluOp   <= ADDU_a;
             when "01110" =>
                 -- CMPI
                 regDst  <= Regd_SP;  regWrite <= Regw_T;
-                immEx   <= "1";      immSrc   <= Imms_70;
+                immEx   <= '1';      immSrc   <= Imms_70;
                 aluSrcA <= Srca_A;   aluSrcB  <= Srcb_IM;
-                aluOp   <= CMP_;
+                aluOp   <= CMP_a;
             when "01101" =>
                 -- LI
                 regDst  <= Regd_RX;  regWrite <= Regw_RD;
-                immEx   <= "0";      immSrc   <= Imms_70;
+                immEx   <= '0';      immSrc   <= Imms_70;
                 aluSrcA <= Srca_A;   aluSrcB  <= Srcb_IM;
-                aluOp   <= PASSB_;
+                aluOp   <= PASSB_a;
             when "10010" =>
                 -- LW_SP
-                immEx   <= "1";      immSrc   <= Imms_70;
-                aluSrcA <= Srca_IM;  aluSrcB  <= Srcb_SP;  aluOp    <= ADD_;
-                memRead <= "1";      memToReg <= "1";      memWrite <= "0";
+                immEx   <= '1';      immSrc   <= Imms_70;
+                aluSrcA <= Srca_IM;  aluSrcB  <= Srcb_SP;  aluOp    <= ADDU_a;
+                memRead <= '1';      memToReg <= '1';      memWrite <= '0';
                 regDst  <= Regd_RX;  regWrite <= Regw_RD;
             when "11010" =>
                 -- SW_SP
-                immEx   <= "1";      immSrc   <= Imms_70;
-                aluSrcA <= Srca_IM;  aluSrcB  <= Srcb_SP;  aluOp    <= ADD_;
-                memRead <= "0";      memToReg <= "0";      memWrite <= "1";     memData <= Memd_A;
+                immEx   <= '1';      immSrc   <= Imms_70;
+                aluSrcA <= Srca_IM;  aluSrcB  <= Srcb_SP;  aluOp    <= ADDU_a;
+                memRead <= '0';      memToReg <= '0';      memWrite <= '1';     memData <= Memd_A;
                 regDst  <= Regd_SP;  regWrite <= Regw_NO;
             when "00010" =>
                 -- B
-                immEx   <= "1";      immSrc   <= Imms_10;
-                aluSrcA <= Srca_A;  aluSrcB   <= Srca_B;   aluOp    <= PASSA_;
-                memRead <= "0";      memToReg <= "0";      memWrite <= "0";     memData <= Memd_A;
+                immEx   <= '1';      immSrc   <= Imms_10;
+                aluSrcA <= Srca_A;  aluSrcB   <= Srcb_B;   aluOp    <= PASSA_a;
+                memRead <= '0';      memToReg <= '0';      memWrite <= '0';     memData <= Memd_A;
                 regDst  <= Regd_SP;  regWrite <= Regw_NO;
-                pcSrc   <= Pcs_ID;
             when "00100" =>
                 -- BEQZ
-                immEx   <= "1";      immSrc   <= Imms_70;
-                aluSrcA <= Srca_A;   aluSrcB  <= Srca_B;   aluOp     <= PASSA_;
-                memRead <= "0";      memToReg <= "0";      memWrite  <= "0";     memData <= Memd_A;
+                immEx   <= '1';      immSrc   <= Imms_70;
+                aluSrcA <= Srca_A;   aluSrcB  <= Srcb_B;   aluOp     <= PASSA_a;
+                memRead <= '0';      memToReg <= '0';      memWrite  <= '0';     memData <= Memd_A;
                 regDst  <= Regd_SP;  regWrite <= Regw_NO;
-                pcSrc   <= Pcs_ID;
             when "00101" =>
                 -- BNEZ
-                immEx   <= "1";      immSrc   <= Imms_70;
-                aluSrcA <= Srca_A;   aluSrcB  <= Srca_B;   aluOp     <= PASSA_;
-                memRead <= "0";      memToReg <= "0";      memWrite  <= "0";     memData <= Memd_A;
+                immEx   <= '1';      immSrc   <= Imms_70;
+                aluSrcA <= Srca_A;   aluSrcB  <= Srcb_B;   aluOp     <= PASSA_a;
+                memRead <= '0';      memToReg <= '0';      memWrite  <= '0';     memData <= Memd_A;
                 regDst  <= Regd_SP;  regWrite <= Regw_NO;
-                pcSrc   <= Pcs_ID;
-            when "11101" =>
-                -- JR
-                immEx   <= "1";      immSrc   <= Imms_00;
-                aluSrcA <= Srca_A;   aluSrcB  <= Srca_B;   aluOp     <= PASSA_;
-                memRead <= "0";      memToReg <= "0";      memWrite  <= "0";     memData <= Memd_A;
-                regDst  <= Regd_SP;  regWrite <= Regw_NO;
-                pcSrc   <= Pcs_NR;
             when others =>
                 -- nothing
         end case;

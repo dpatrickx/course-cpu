@@ -20,8 +20,8 @@ entity IDEX is
 
          PC_out     : out std_logic_vector(15 downto 0);
          OP_out     : out std_logic_vector(4 downto 0);
-         A_out      : out std_logic_vector(2 downto 0);
-         B_out      : out std_logic_vector(2 downto 0);
+         A_out      : out std_logic_vector(15 downto 0);
+         B_out      : out std_logic_vector(15 downto 0);
          rd_out     : out std_logic_vector(2 downto 0);
          rs_out     : out std_logic_vector(2 downto 0);
          rt_out     : out std_logic_vector(2 downto 0);
@@ -35,7 +35,7 @@ begin
     process(clk)
     begin
         if rst='0' then
-            OP_in <= "00000";
+            OP_out <= "00000";
         elsif clk = '1' and clk'event then
             PC_out      <= PC_in;
             OP_out      <= OP_in;
