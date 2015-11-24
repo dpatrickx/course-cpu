@@ -6,6 +6,7 @@ use my_data_types.ALL;
 
 -- author: dpatrickx
 -- ID : get control signals according to instructions
+-- ID : expand immidiate to 16 bits
 
 entity control is
     port(
@@ -22,7 +23,6 @@ entity control is
         aluSrcA : out std_logic_vector(2 downto 0)          := "000";     -- not decided
         aluSrcB : out std_logic_vector(2 downto 0)          := "000";
         aluOp : out std_logic_vector(4 downto 0);           := "00000"-- not decided
-
         pcWrite : out std_logic                             := "0";
         pcSrc : out std_logic_vector(1 downto 0)            := "000";       -- not decided
         immEx : out std_logic                               := "0";
@@ -73,6 +73,9 @@ constant Pcs_RX   : std_logic_vector(1 downto 0)  := "00";
 
 constant Memd_A   : std_logic := "0";
 constant Memd_B   : std_logic := "1";
+
+constant NO    : std_logic := "0";
+constant YES   : std_logic := "1";
 begin
     -- get rd due to regDst
     getRd: process(regDst, comBody)
@@ -291,6 +294,8 @@ begin
                 memRead <= "0";      memToReg <= "0";      memWrite  <= "0";     memData <= Memd_A;
                 regDst  <= Regd_SP;  regWrite <= Regw_NO;
                 pcSrc   <= Pcs_RX;
+            when others =>
+                -- nothing
         end case;
     end process;
 
