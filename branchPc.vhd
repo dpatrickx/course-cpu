@@ -68,7 +68,7 @@ begin
             when "00101" => pcOut <= (pcIn + imm);
             when "01100" => pcOut <= (pcIn + imm);
             when "11101" => pcOut <= valueA;
-                when others => --nothing
+				when others => --nothing
         end case;
     end process;
     -- pcSrc
@@ -107,7 +107,7 @@ begin
                 end case;
             when "11101" => pcSrc <= Pcs_ID;
             when "00010" => pcSrc <= Pcs_ID;
-                when others => --nothing
+				when others => --nothing
         end case;
     end process;
 end behavior;

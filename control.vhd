@@ -13,7 +13,6 @@ entity control is
         pcIn        : in std_logic_vector(15 downto 0);
         opIn        : in std_logic_vector(4 downto 0);
         comBody     : in std_logic_vector(10 downto 0);
-        bubble      : in std_logic;
         rdPcWrite   : in std_logic;
 
         -- im
