@@ -2,7 +2,7 @@ LIBRARY IEEE;
 USE IEEE.STD_LOGIC_1164.ALL;
 USE IEEE.STD_LOGIC_ARITH.ALL;
 USE IEEE.STD_LOGIC_UNSIGNED.ALL;
-use my_data_types.ALL;
+use work.my_data_types.ALL;
 
 -- author : dpatrickx
 -- ID : pass im, rd, rs, rt, spcial value according to control signals
@@ -53,8 +53,8 @@ begin
                 rd <= instBody(4 downto 2);
             when Regd_SP =>
                 rd <= ZERO_3;
-			   when others =>
-				    -- nothing
+               when others =>
+                    -- nothing
         end case;
     end process;
     -- im
@@ -65,25 +65,25 @@ begin
                 case instBody(10) is
                     when '0' => im <= "00000" & instBody;
                     when '1' => im <= "11111" & instBody;
-						  when others => -- nothing
+                          when others => -- nothing
                 end case;
             when Imms_70 =>
                 case instBody(7) is
                     when '0' => im <= ZERO_8 & instBody(7 downto 0);
                     when '1' => im <= ONE_8  & instBody(7 downto 0);
-						  when others => -- nothing
+                          when others => -- nothing
                 end case;
             when Imms_40 =>
                 case instBody(4) is
                     when '0' => im <= ZERO_11 & instBody(4 downto 0);
                     when '1' => im <= ONE_11  & instBody(4 downto 0);
-						  when others => -- nothing
+                          when others => -- nothing
                 end case;
             when Imms_30 =>
                 case instBody(3) is
                     when '0' => im <= ZERO_12 & instBody(3 downto 0);
                     when '1' => im <= ONE_12  & instBody(3 downto 0);
-						  when others => -- nothing
+                          when others => -- nothing
                 end case;
             when Imms_42 =>
             -- only need to use last 3 bits
