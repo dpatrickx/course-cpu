@@ -4,8 +4,9 @@ USE IEEE.STD_LOGIC_ARITH.ALL;
 USE IEEE.STD_LOGIC_UNSIGNED.ALL;
 
 entity IDEX is
-    port(clk: in std_logic;
-         rst: in std_logic;
+    port(
+        clk: in std_logic;
+        rst: in std_logic;
 
         PC_in      : in std_logic_vector(15 downto 0);
         OP_in      : in std_logic_vector(4 downto 0);
@@ -59,7 +60,7 @@ end IDEX;
 architecture behavior of IDEX is
 signal opValue : std_logic_vector(4 downto 0) := OP_in;
 begin
-    process(clk)
+    process(clk, rst)
     begin
         if rst='0' then
             opValue <= "00000";
