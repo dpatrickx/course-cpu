@@ -1,3 +1,14 @@
+---------- EXE ----------
+-- variable
+shared variable exe_cnt : int8 := 0;
+-- general signal
+signal exe_alu_pre_1   : std_logic_vector(15 downto 0) := zero16;
+signal exe_alu_pre_2   : std_logic_vector(15 downto 0) := zero16;
+signal exe_forward_1   : std_logic_vector(1 downto 0)  := "00";
+signal exe_forward_2   : std_logic_vector(1 downto 0)  := "00";
+signal exe_alu_input_A : std_logic_vector(15 downto 0) := zero16;
+signal exe_alu_input_B : std_logic_vector(15 downto 0) := zero16;
+
 -------------------- EXE --------------------
 u_forwarding_unit : ForwardingUnit port map ( -- when exe_cnt = 0
     Rx             => id_exe_rx,
