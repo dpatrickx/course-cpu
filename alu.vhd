@@ -1,7 +1,9 @@
-library IEEE;
-use IEEE.STD_LOGIC_1164.ALL;
-use IEEE.STD_LOGIC_ARITH.ALL;
-use IEEE.STD_LOGIC_UNSIGNED.ALL;
+LIBRARY IEEE;
+USE IEEE.STD_LOGIC_1164.ALL;
+USE IEEE.STD_LOGIC_ARITH.ALL;
+USE IEEE.STD_LOGIC_UNSIGNED.ALL;
+use work.control.ALL;
+use work.my_data_types.ALL;
 
 entity ALU is
     Port ( aluOp : in  STD_LOGIC_VECTOR (3 downto 0);
