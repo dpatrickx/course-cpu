@@ -2,7 +2,7 @@ LIBRARY IEEE;
 USE IEEE.STD_LOGIC_1164.ALL;
 USE IEEE.STD_LOGIC_ARITH.ALL;
 USE IEEE.STD_LOGIC_UNSIGNED.ALL;
-use my_data_types.ALL;
+use work.my_data_types.ALL;
 
 -- author: dpatrickx
 -- ID : get control signals according to instructions
