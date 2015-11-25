@@ -12,10 +12,11 @@ entity reg is
         regWrite    : in std_logic_vector(2 downto 0);
         regWriteAdd : in std_logic_vector(2 downto 0);
         data        : in std_logic_vector(15 downto 0);
+		  pc		     : in std_logic_vector(15 downto 0);
+
         aluSrcA     : in std_logic;
         aluSrcB     : in std_logic_vector(2 downto 0);
-        instruction : in std_logic_vector(15 downto 0);
-        pc          : in std_logic_vector(15 downto 0);
+        instBody    : in std_logic_vector(10 downto 0);
 
         regT        : inout WORD;
         regIH       : inout WORD;
@@ -36,7 +37,7 @@ begin
         begin
         case aluSrcA is
             when Srca_A =>
-                rs <= instruction(10 downto 8);
+                rs <= instBody(10 downto 8);
                 valueA <= regiArr(conv_integer(rs));
             when others =>
                 valueA <= ZERO_16;
@@ -47,7 +48,7 @@ begin
         begin
         case aluSrcB is
             when Srcb_B =>
-                rt <= instruction(7 downto 5);
+                rt <= instBody(7 downto 5);
                 valueB <= regiArr(conv_integer(rt));
             when others =>
                 valueB <= ZERO_16;
