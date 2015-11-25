@@ -14,12 +14,14 @@ USE IEEE.STD_LOGIC_UNSIGNED.ALL;
 
 entity MemProcess is
 	port(clk_50m: in std_logic;
+		 rd_in: in std_logic_vector(15 downto 0);
+
+		 PCaddr_in: in std_logic_vector(15 downto 0);
 
 		 ex_data: in std_logic_vector(15 downto 0);
 		 ans: in std_logic_vector(15 downto 0);
 		 MemRead: in std_logic;
 		 MemWrite: in std_logic;
-		 MemtoReg: in std_logic;
 		 ram2_oe: out std_logic;
 		 ram2_we: out std_logic;
 		 ram2_en: out std_logic;
@@ -27,49 +29,50 @@ entity MemProcess is
 		 data_ram2: inout std_logic_vector(15 downto 0);
 
 		 data: out std_logic_vector(15 downto 0);
-		 rd: out std_logic_vector(15 downto 0)
+		 rd: out std_logic_vector(15 downto 0);
+		 clk: out std_logic_vector(15 downto 0)
 		 PC: out std_logic_vector(15 downto 0));
 end MemProcess;
 
 architecture behavior of MemProcess is
-	type state is(ready, reading, writing, loading, get);
+	type state is(ready, reading, writing, get);
 	signal current_state: state: = ready;
 	signal data0 : std_logic_vector(15 downto 0);
 begin
-	process(clk)
+	with state select
+		clk <= '1' when reading, writing,
+			   '0' when others;
+	addr_ram2 <= "000000000000000000";
+	rd <= rd_in;
+	process(clk_50m)
 	begin
-		if clk = '1' and clk'event then
+		if clk_50m = '1' and clk_50m'event then
 			case current_state is
 				when ready =>
-					if MemWrite = '1' then
-						ram2_oe <= '1';
-						ram2_we <= '1';
-						ram2_en <= '0';
-						addr_ram2 <= ans;
-						current_state <= writing;
-					else
-						ram2_oe <= '1';
-						ram2_we <= '1';
-						ram2_en <= '0';
-						data_ram2 <= "ZZZZZZZZZZZZZZZZ";
-						addr_ram2 <= ans;
-						current_state <= reading;
-					end if;
-				when writing =>
+					ram2_oe <= '1';
+					ram2_we <= '1';
+					ram2_en <= '0';
+					addr_ram2(15 downto 0) <= ans;
 					data_ram2 <= ex_data;
-					ram2_we <= '0';
-					current_state <= get;
+					ram2_we <= not MemWrite;
+					current_state <= writing;
+				when writing =>
+					data_ram2 <= "ZZZZZZZZZZZZZZZZ";
+					ram2_oe <= not MemRead;
+					current_state <= reading;
 				when reading =>
+					ram2_we <= '1';
+					if MemRead = '1' then
+						data0 <= data_ram2;
+					end if;
+					addr_ram2(15 downto 0) <= PCaddr_in;
+					data_ram2 <= "ZZZZZZZZZZZZZZZZ";
 					ram2_oe <= '0';
-					data0 <= data_ram2;
 					current_state <= get;
 				when get =>
-					data_ram2 <= "ZZZZZZZZZZZZZZZZ";
-					ram2_we <= '1';
-					ram2_oe <= '0';
-					current_state <= get;
-				when loading =>
 					PC <= data_ram2;
+					current_state <= ready;
+				when others =>
 					current_state <= ready;
 			end case;
 		end if;

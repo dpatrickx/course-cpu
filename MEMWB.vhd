@@ -12,7 +12,7 @@ USE IEEE.STD_LOGIC_UNSIGNED.ALL;
 --library UNISIM;
 --use UNISIM.VComponents.all;
 
-entity IDEX is
+entity MEMWB is
 	port(clk: in std_logic;
 		 rst: in std_logic;
 
@@ -38,9 +38,9 @@ entity IDEX is
 		 rt_out: out std_logic_vector(2 downto 0);
 		 data_out: out std_logic_vector(15 downto 0)
 		 );
-end IDEX;
+end MEMWB;
 
-architecture behavior of IDEX is
+architecture behavior of MEMWB is
 begin
 	process(clk)
 	begin
